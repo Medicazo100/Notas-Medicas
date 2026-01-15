@@ -356,7 +356,12 @@ export default function App() {
       <AuroraStyles />
       <div className="bg-emerald-600 dark:bg-emerald-950 sticky top-0 z-40 px-4 py-6 flex justify-between items-center shadow-lg border-b border-transparent dark:border-emerald-900">
          <div className="flex items-center gap-3"><div className="bg-white/20 text-white p-2 rounded-lg"><Stethoscope size={24}/></div><div><h1 className="font-bold text-xl text-white">Nota de Ingreso Hospitalario</h1><p className="text-[10px] text-emerald-100 opacity-80">By Dr. Gabriel Mendez</p></div></div>
-         <div className="flex gap-2"><button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/10 rounded-full">{isProcessing ? <Loader2 className="animate-spin" /> : <Sparkles size={20}/>}</button><button onClick={() => setDark(!dark)} className="p-2 text-white">{dark ? <Sun size={20}/> : <Moon size={20}/>}</button><button onClick={() => setShowHistory(true)} className="p-2 text-white"><Archive size={20}/></button></div>
+         <div className="flex gap-2">
+           <button onClick={() => setShowQr(true)} className="p-2 text-white hover:bg-white/10 rounded-full" title="Ver código QR"><QrCode size={20}/></button>
+           <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/10 rounded-full">{isProcessing ? <Loader2 className="animate-spin" /> : <Sparkles size={20}/>}</button>
+           <button onClick={() => setDark(!dark)} className="p-2 text-white">{dark ? <Sun size={20}/> : <Moon size={20}/>}</button>
+           <button onClick={() => setShowHistory(true)} className="p-2 text-white"><Archive size={20}/></button>
+         </div>
       </div>
       <div className="bg-blue-500 dark:bg-slate-950 px-4 pt-6 pb-12 shadow-sm relative z-20"><div className="flex justify-between max-w-lg mx-auto">{STEPS_CONFIG.map(s => <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer"><div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}><s.icon size={22}/></div><span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-blue-100/60'}`}>{s.label}</span></div>)}</div></div>
       <main className="px-4 -mt-6 relative z-30"><div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 shadow-2xl max-w-3xl mx-auto min-h-[60vh] flex flex-col justify-between">
@@ -371,6 +376,27 @@ export default function App() {
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce flex items-center gap-2 text-sm"><CheckCircle size={16} className="text-emerald-400"/> {toast}</div>}
       {processingResult && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"><h3 className="font-bold text-indigo-600 mb-4 flex items-center gap-2"><Sparkles/> Análisis Automatizado</h3><div className="space-y-4 text-sm"><div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg"><b>Redacción sugerida:</b><p className="italic mt-1">"{processingResult.improvedMotivo}"</p></div><div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg"><b>Plan sugerido:</b><p className="mt-1">{processingResult.improvedPlan}</p></div></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setProcessingResult(null)} className="px-4 py-2 text-slate-500">Descartar</button><button onClick={applySystemSuggestions} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Aplicar cambios</button></div></div></div>}
       {showHistory && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-4 max-h-[70vh] flex flex-col"><div className="flex justify-between items-center mb-4 border-b pb-2"><h3 className="font-bold">Historial</h3><button onClick={() => setShowHistory(false)}><X/></button></div><div className="flex-1 overflow-y-auto space-y-2">{notes.length===0 ? <p className="text-center text-slate-400 py-8">Vacio</p> : notes.map(n => <div key={n.id} className="p-3 border rounded-lg flex justify-between items-center"><div className="text-sm font-bold">{n.form.nombre || 'Sin nombre'}</div><div className="flex gap-2"><button onClick={() => { setForm(n.form); setShowHistory(false); showToast('Cargado'); }} className="p-1 text-blue-500"><FileUp size={16}/></button><button onClick={() => setNotes(StorageService.deleteNote(n.id))} className="p-1 text-red-500"><Trash2 size={16}/></button></div></div>)}</div></div></div>}
+      
+      {showQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 max-w-sm w-full border border-slate-200 dark:border-slate-700">
+              <div className="flex justify-between w-full mb-4">
+                 <h3 className="font-bold text-lg dark:text-white">Compartir App</h3>
+                 <button onClick={() => setShowQr(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://notas-medicas.vercel.app/" 
+                  alt="QR Code" 
+                  className="w-48 h-48"
+                />
+              </div>
+              <p className="mt-4 text-sm text-center text-slate-500 dark:text-slate-400">
+                Escanea este código para abrir la aplicación en tu dispositivo móvil.
+              </p>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
