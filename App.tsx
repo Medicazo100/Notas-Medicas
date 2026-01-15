@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Mic, Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
-  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2
+  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
 import { SectionTitle, Label, Input, Select, TextArea } from './components/UIComponents';
 import { AiService } from './services/aiService';
 import { StorageService } from './services/storageService';
-import { INITIAL_FORM, SIGNOS_ORDER, SIGNOS_LABELS, SIGNOS_UNITS, MONTHS, SEMIOLOGIA_TAGS, EXPLORACION_PLANTILLAS, ANTECEDENTES_OPTS, SUGERENCIAS_DX, STEPS_CONFIG } from './constants';
+import { INITIAL_FORM, SIGNOS_ORDER, SIGNOS_LABELS, SIGNOS_UNITS, MONTHS, SEMIOLOGIA_TAGS, EXPLORACION_PLANTILLAS, ANTECEDENTES_OPTS, SUGERENCIAS_DX, DX_PRESETS, PRONOSTICO_OPTS, STEPS_CONFIG } from './constants';
 import { PatientForm, AiAnalysisResult, NoteEntry } from './types';
 
 export default function App() {
@@ -131,7 +131,7 @@ export default function App() {
         g: { ...prev.g, ...parsedData.g }
       }));
       setImportText('');
-      showToast('Formulario autocompletado con éxito');
+      showToast('Formulario autocompletado e integrado en todas las secciones');
     } else {
       showToast('Error al interpretar los datos');
     }
@@ -173,7 +173,7 @@ export default function App() {
   const removeDx = (dx: string) => {
     updateForm('diagnostico', form.diagnostico.filter(x => x !== dx));
   };
-
+  
   const saveToHistory = () => {
     const note: NoteEntry = { id: Date.now(), date: new Date().toISOString(), form: { ...form } };
     const updatedNotes = StorageService.saveNote(note);
@@ -262,28 +262,41 @@ export default function App() {
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <SectionTitle><User size={20}/> Ficha de Identificación</SectionTitle>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div><Label>Folio / Expediente</Label><Input value={form.folio} onChange={e => updateForm('folio', e.target.value)} placeholder="000-000" /></div>
-               <div><Label>Fecha Nacimiento</Label><div className="grid grid-cols-3 gap-2">
+            
+            <div><Label>Folio / Expediente</Label><Input value={form.folio} onChange={e => updateForm('folio', e.target.value)} placeholder="000-000" /></div>
+            
+            <div><Label>Fecha Nacimiento</Label>
+              <div className="grid grid-cols-3 gap-2">
                  <Select value={dob.d} onChange={e => setDob({...dob, d: e.target.value})}><option value="">Día</option>{Array.from({length: 31}, (_, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{i + 1}</option>)}</Select>
                  <Select value={dob.m} onChange={e => setDob({...dob, m: e.target.value})}><option value="">Mes</option>{MONTHS.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}</Select>
                  <Select value={dob.y} onChange={e => setDob({...dob, y: e.target.value})}><option value="">Año</option>{Array.from({length: 100}, (_, i) => { const y = new Date().getFullYear() - i; return <option key={y} value={y}>{y}</option>; })}</Select>
-               </div></div>
+              </div>
             </div>
+
             <div><Label>Nombre Completo</Label><Input value={form.nombre} onChange={e => updateForm('nombre', e.target.value)} placeholder="Apellidos, Nombres" /></div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Edad Calculada</Label><Input value={form.edad} readOnly className="font-bold bg-slate-50 dark:bg-slate-950" /></div>
               <div><Label>Sexo</Label><Select value={form.sexo} onChange={e => updateForm('sexo', e.target.value)}><option value="">-</option><option>Masculino</option><option>Femenino</option></Select></div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div><Label>Estado Civil</Label><Select value={form.estadoCivil} onChange={e => updateForm('estadoCivil', e.target.value)}><option value="">-</option><option>Soltero/a</option><option>Casado/a</option><option>Unión Libre</option></Select></div>
-              <div><Label>Escolaridad</Label><Select value={form.escolaridad} onChange={e => updateForm('escolaridad', e.target.value)}><option value="">-</option><option>Ninguna</option><option>Primaria</option><option>Secundaria</option><option>Licenciatura</option></Select></div>
-              <div><Label>Ocupación</Label><Input value={form.ocupacion} onChange={e => updateForm('ocupacion', e.target.value)} /></div>
-            </div>
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-4"><SectionTitle><Stethoscope size={20}/> Médico Tratante</SectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Nombre del Médico</Label><Input value={form.medicoTratante} onChange={e => updateForm('medicoTratante', e.target.value)} /></div>
-                <div><Label>Cédula</Label><Input value={form.cedulaProfesional} onChange={e => updateForm('cedulaProfesional', e.target.value)} /></div>
+            
+            <div><Label>Estado Civil</Label><Select value={form.estadoCivil} onChange={e => updateForm('estadoCivil', e.target.value)}><option value="">-</option><option>Soltero/a</option><option>Casado/a</option><option>Unión Libre</option></Select></div>
+            
+            <div><Label>Escolaridad</Label><Select value={form.escolaridad} onChange={e => updateForm('escolaridad', e.target.value)}><option value="">-</option><option>Ninguna</option><option>Primaria</option><option>Secundaria</option><option>Licenciatura</option></Select></div>
+            
+            <div><Label>Ocupación</Label><Input value={form.ocupacion} onChange={e => updateForm('ocupacion', e.target.value)} /></div>
+            
+            <div><Label>Domicilio</Label><Input value={form.domicilio} onChange={e => updateForm('domicilio', e.target.value)} placeholder="Calle, Número, Colonia, C.P." /></div>
+
+            <div><Label>Responsable (Familiar)</Label><Input value={form.responsable} onChange={e => updateForm('responsable', e.target.value)} placeholder="Nombre del familiar responsable" /></div>
+            
+            <div><Label>Teléfono</Label><Input value={form.telefono} onChange={e => updateForm('telefono', e.target.value)} placeholder="10 dígitos" /></div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
+              <SectionTitle><Stethoscope size={20}/> Datos del Médico</SectionTitle>
+              <div className="space-y-4">
+                <div><Label>Médico Tratante</Label><Input value={form.medicoTratante} onChange={e => updateForm('medicoTratante', e.target.value)} /></div>
+                <div><Label>Cédula Profesional</Label><Input value={form.cedulaProfesional} onChange={e => updateForm('cedulaProfesional', e.target.value)} /></div>
               </div>
             </div>
           </div>
@@ -292,10 +305,57 @@ export default function App() {
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <SectionTitle><History size={20}/> Motivo de Consulta</SectionTitle>
-            <div><Label>Síntoma Principal</Label><Input value={form.sintomaPrincipal} onChange={e => updateForm('sintomaPrincipal', e.target.value)} /></div>
-            <div className="relative"><Label>Padecimiento Actual</Label>
-              <TextArea rows={10} value={form.padecimientoActual} onChange={e => updateForm('padecimientoActual', e.target.value)} />
-              <button onClick={() => toggleVoice('padecimientoActual')} className={`absolute bottom-3 right-3 p-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-emerald-600'} text-white shadow-lg`}><Mic size={20} /></button>
+            
+            <div>
+              <Label>Síntoma Principal</Label>
+              <Input 
+                value={form.sintomaPrincipal} 
+                onChange={e => updateForm('sintomaPrincipal', e.target.value)} 
+                placeholder="Ej. Convulsiones, Dolor torácico..." 
+              />
+            </div>
+
+            <div>
+              <Label>Tiempo de Evolución</Label>
+              <Input 
+                value={form.tiempoEvolucion} 
+                onChange={e => updateForm('tiempoEvolucion', e.target.value)} 
+                placeholder="Ej. 30 minutos, 2 días..." 
+              />
+            </div>
+
+            <div className="relative">
+              <Label>Padecimiento Actual (Breve)</Label>
+              <div className="relative">
+                <TextArea 
+                  rows={12} 
+                  value={form.padecimientoActual} 
+                  onChange={e => updateForm('padecimientoActual', e.target.value)} 
+                  className="pb-10" 
+                />
+                <button 
+                  onClick={() => toggleVoice('padecimientoActual')} 
+                  className={`absolute bottom-3 right-3 p-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-emerald-600'} text-white shadow-lg transition-transform hover:scale-110 active:scale-95`}
+                >
+                  <Mic size={20} />
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mt-3">
+                 {SEMIOLOGIA_TAGS.map(tag => (
+                   <button 
+                     key={tag}
+                     onClick={() => {
+                       const text = form.padecimientoActual;
+                       const separator = text.length > 0 && !text.endsWith('\n') ? '\n' : '';
+                       updateForm('padecimientoActual', text + separator + tag + ' ');
+                     }}
+                     className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 shadow-sm"
+                   >
+                     <Plus size={12}/> {tag.replace(':', '')}
+                   </button>
+                 ))}
+              </div>
             </div>
           </div>
         );
@@ -303,47 +363,348 @@ export default function App() {
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <SectionTitle><HeartPulse size={20}/> Signos Vitales & Glasgow</SectionTitle>
-            <div className="grid grid-cols-3 gap-3">{SIGNOS_ORDER.map(key => (
-              <div key={key} className="p-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-center">
-                <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">{SIGNOS_LABELS[key]}</label>
-                <input value={(form.signos as any)[key]} onChange={e => handleSigno(key, e.target.value)} className="w-full text-center text-lg font-bold bg-transparent outline-none" />
-                <span className="text-[9px] text-slate-400">{SIGNOS_UNITS[key]}</span>
-              </div>
-            ))}</div>
-            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-              <h4 className="text-sm font-bold mb-3">Escala de Glasgow: {glasgowTotal}</h4>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1"><span className="text-[10px] text-center">Ocular</span>{[4,3,2,1].map(v => <button key={v} onClick={() => setForm(p=>({...p, g:{...p.g, o:v}}))} className={`py-1 text-sm rounded ${Number(form.g.o)===v ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>{v}</button>)}</div>
-                <div className="flex flex-col gap-1"><span className="text-[10px] text-center">Verbal</span>{[5,4,3,2,1].map(v => <button key={v} onClick={() => setForm(p=>({...p, g:{...p.g, v:v}}))} className={`py-1 text-sm rounded ${Number(form.g.v)===v ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>{v}</button>)}</div>
-                <div className="flex flex-col gap-1"><span className="text-[10px] text-center">Motora</span>{[6,5,4,3,2,1].map(v => <button key={v} onClick={() => setForm(p=>({...p, g:{...p.g, m:v}}))} className={`py-1 text-sm rounded ${Number(form.g.m)===v ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>{v}</button>)}</div>
+            
+            {/* Vital Signs Grid */}
+            <div className="grid grid-cols-3 gap-3">
+              {SIGNOS_ORDER.map(key => (
+                <div key={key} className="aspect-square p-2 bg-slate-100 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center shadow-sm transition-all focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 relative group">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 mb-1">{SIGNOS_LABELS[key]}</label>
+                  <input 
+                    value={(form.signos as any)[key]} 
+                    onChange={e => handleSigno(key, e.target.value)} 
+                    className="w-full text-center text-xl sm:text-2xl font-bold bg-transparent outline-none text-slate-800 dark:text-white"
+                  />
+                  <span className="text-[10px] text-slate-400">{SIGNOS_UNITS[key]}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Glasgow Scale */}
+            <div className="bg-slate-100 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <h4 className="text-sm font-bold mb-4 text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600 pb-2">Escala de Glasgow</h4>
+              <div className="flex gap-4">
+                <div className="grid grid-cols-3 gap-2 flex-1">
+                  {/* Ocular */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] text-center text-slate-400 uppercase font-bold">Ocular</span>
+                    {[4,3,2,1].map(v => (
+                      <button 
+                        key={v} 
+                        onClick={() => setForm(p=>({...p, g:{...p.g, o:v}}))} 
+                        className={`h-8 text-sm rounded-lg font-bold transition-all ${Number(form.g.o)===v ? 'bg-indigo-600 text-white shadow-md scale-105' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-500'}`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Verbal */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] text-center text-slate-400 uppercase font-bold">Verbal</span>
+                    {[5,4,3,2,1].map(v => (
+                      <button 
+                        key={v} 
+                        onClick={() => setForm(p=>({...p, g:{...p.g, v:v}}))} 
+                        className={`h-8 text-sm rounded-lg font-bold transition-all ${Number(form.g.v)===v ? 'bg-indigo-600 text-white shadow-md scale-105' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-500'}`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Motora */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] text-center text-slate-400 uppercase font-bold">Motora</span>
+                    {[6,5,4,3,2,1].map(v => (
+                      <button 
+                        key={v} 
+                        onClick={() => setForm(p=>({...p, g:{...p.g, m:v}}))} 
+                        className={`h-8 text-sm rounded-lg font-bold transition-all ${Number(form.g.m)===v ? 'bg-indigo-600 text-white shadow-md scale-105' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-500'}`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Total & Pupilas Right Panel */}
+                <div className="flex flex-col items-center justify-center min-w-[90px] border-l border-slate-200 dark:border-slate-600 pl-4 gap-4">
+                   <div className="text-center">
+                     <span className="text-[10px] uppercase text-slate-400 block mb-1">Total</span>
+                     <span className="text-5xl font-bold text-emerald-500">{glasgowTotal}</span>
+                   </div>
+                   <div className="w-full relative group">
+                      <select
+                        value={form.pupilas}
+                        onChange={(e) => updateForm('pupilas', e.target.value)}
+                        className="w-full py-2 px-1 text-[10px] bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-600 text-center outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-700 dark:text-slate-300 cursor-pointer appearance-none"
+                        style={{textAlignLast: 'center'}}
+                      >
+                        <option value="Isocóricas">Isocóricas</option>
+                        <option value="Miosis">Miosis</option>
+                        <option value="Midriasis">Midriasis</option>
+                        <option value="Anisocoria">Anisocoria</option>
+                      </select>
+                   </div>
+                </div>
               </div>
             </div>
-            <div><Label>Exploración Física</Label><TextArea rows={6} value={form.exploracion} onChange={e => updateForm('exploracion', e.target.value)} /></div>
+
+            {/* Exploración Física */}
+            <div>
+              <Label>Exploración Física Breve</Label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                 {Object.keys(EXPLORACION_PLANTILLAS).map(key => (
+                    <button 
+                      key={key}
+                      onClick={() => {
+                        const text = form.exploracion;
+                        const separator = text.length > 0 && !text.endsWith('\n') ? '\n\n' : '';
+                        // Just append the text
+                        updateForm('exploracion', text + separator + key + ':\n' + EXPLORACION_PLANTILLAS[key]);
+                      }}
+                      className="px-3 py-1.5 bg-slate-700/80 text-white rounded-full text-xs font-bold hover:bg-slate-600 transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <Plus size={12}/> {key}
+                    </button>
+                 ))}
+              </div>
+              <TextArea 
+                rows={8} 
+                value={form.exploracion} 
+                onChange={e => updateForm('exploracion', e.target.value)} 
+                placeholder="Describe aqui una exploracion fisica completa, sistematica y detallada del paciente"
+                className="bg-slate-800 border-slate-700 text-slate-200"
+              />
+            </div>
           </div>
         );
       case 4:
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+          <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             <SectionTitle><ClipboardPlus size={20}/> Antecedentes</SectionTitle>
-            <div className="flex flex-wrap gap-2">{ANTECEDENTES_OPTS.map(o => <button key={o} onClick={() => addAntecedente(o)} className="px-3 py-1 bg-white border border-slate-300 dark:bg-slate-950 dark:border-slate-700 rounded text-sm hover:bg-slate-50">+ {o}</button>)}</div>
-            <div className="flex flex-wrap gap-2 min-h-[40px] p-2 bg-slate-50 dark:bg-slate-950 rounded-lg">{form.antecedentes.map(a => <span key={a} className="bg-white dark:bg-slate-800 px-2 py-1 rounded-md text-sm border flex items-center gap-2">{a} <button onClick={() => removeAntecedente(a)}><X size={12}/></button></span>)}</div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Tabaquismo</Label><Select value={form.tabaquismo} onChange={e => updateForm('tabaquismo', e.target.value)}><option>Negado</option><option>Positivo</option></Select></div>
-              <div><Label>Alcohol</Label><Select value={form.alcohol} onChange={e => updateForm('alcohol', e.target.value)}><option>Negado</option><option>Ocasional</option></Select></div>
+            
+            {/* Patológicos */}
+            <div>
+               <Label>Patológicos</Label>
+               {/* Container for tags */}
+               <div className="min-h-[60px] p-3 bg-slate-100 dark:bg-[#1e293b] rounded-xl mb-3 flex flex-wrap gap-2 items-center border border-slate-200 dark:border-slate-700 shadow-inner">
+                  {form.antecedentes.length === 0 && <span className="text-slate-400 text-sm italic">Ninguno seleccionado</span>}
+                  {form.antecedentes.map(a => (
+                    <span key={a} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 animate-in zoom-in border border-slate-300 dark:border-slate-600">
+                       {a} <button onClick={() => removeAntecedente(a)} className="hover:text-red-500"><X size={14}/></button>
+                    </span>
+                  ))}
+               </div>
+               
+               {/* Quick Buttons Grid */}
+               <div className="grid grid-cols-3 gap-2">
+                 {ANTECEDENTES_OPTS.map(o => (
+                    <button 
+                      key={o} 
+                      onClick={() => addAntecedente(o)} 
+                      className="px-2 py-2 bg-slate-200 dark:bg-[#1e293b] hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700"
+                    >
+                      <Plus size={12}/> {o}
+                    </button>
+                 ))}
+               </div>
             </div>
+
+            {/* Custom Add */}
+            <div>
+               <Label>Añadir Otro Antecedente</Label>
+               <div className="flex gap-2">
+                  <Input 
+                    value={customAntecedente}
+                    onChange={e => setCustomAntecedente(e.target.value)}
+                    placeholder="Ej: Hipotiroidismo"
+                    onKeyDown={e => e.key === 'Enter' && (addAntecedente(customAntecedente), setCustomAntecedente(''))}
+                    className="dark:bg-[#1e293b] dark:border-slate-700"
+                  />
+                  <button 
+                    onClick={() => { addAntecedente(customAntecedente); setCustomAntecedente(''); }}
+                    className="aspect-square bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 w-14"
+                  >
+                    <Plus size={24}/>
+                  </button>
+               </div>
+            </div>
+
+            {/* Alergias */}
+            <div>
+               <Label>Alergias</Label>
+               <Input 
+                 value={form.alergias} 
+                 onChange={e => updateForm('alergias', e.target.value)}
+                 placeholder="Niega o especifica..."
+                 className="dark:bg-[#1e293b] dark:border-slate-700"
+               />
+            </div>
+
+            {/* Habits */}
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                  <Label>Tabaquismo</Label>
+                  <Select 
+                     value={form.tabaquismo} 
+                     onChange={e => updateForm('tabaquismo', e.target.value)}
+                     className="dark:bg-[#1e293b] dark:border-slate-700"
+                  >
+                     <option value="Negado">Niega</option>
+                     <option value="Positivo">Positivo</option>
+                  </Select>
+               </div>
+               <div>
+                  <Label>Alcoholismo</Label>
+                  <Select 
+                     value={form.alcohol} 
+                     onChange={e => updateForm('alcohol', e.target.value)}
+                     className="dark:bg-[#1e293b] dark:border-slate-700"
+                  >
+                     <option value="Negado">Niega</option>
+                     <option value="Ocasional">Ocasional</option>
+                     <option value="Frecuente">Frecuente</option>
+                  </Select>
+               </div>
+            </div>
+
+            <p className="text-center text-[10px] text-slate-400 italic pt-2">
+              Los campos no modificados se asumen negados.
+            </p>
           </div>
         );
       case 5:
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <SectionTitle><CheckCircle size={20}/> Diagnóstico y Plan</SectionTitle>
-            <div><Label>Diagnósticos</Label><div className="space-y-2 mb-4">{form.diagnostico.map(dx => <div key={dx} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-950 rounded border">{dx} <button onClick={() => removeDx(dx)}><Trash2 size={14}/></button></div>)}</div>
-              <div className="flex gap-2"><Input value={customDx} onChange={e => setCustomDx(e.target.value)} placeholder="Nuevo diagnóstico..." onKeyDown={e => e.key==='Enter' && addDx(customDx)} /><button onClick={() => addDx(customDx)} className="bg-emerald-600 text-white p-2 rounded-lg"><Plus/></button></div>
+            
+            {/* Diagnosticos Presuntivos Section */}
+            <div>
+              <Label>Diagnósticos Presuntivos</Label>
+              {/* Container: Light mode: bg-slate-50 border-slate-200. Dark mode: bg-slate-900/50 border-slate-700 */}
+              <div className="min-h-[50px] p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-3 flex flex-col gap-2 border border-slate-200 dark:border-slate-700 transition-colors">
+                  {form.diagnostico.length === 0 ? (
+                    <span className="text-slate-400 dark:text-slate-500 text-sm italic py-2 px-1">No hay diagnósticos agregados.</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {form.diagnostico.map(dx => (
+                        /* Tag: Light: bg-white text-slate-700 border-slate-200. Dark: bg-slate-800 text-slate-200 border-slate-600 */
+                        <div key={dx} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-sm shadow-sm transition-colors">
+                           <span>{dx}</span>
+                           <button onClick={() => removeDx(dx)} className="text-slate-400 hover:text-red-500 dark:hover:text-red-400"><X size={14}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              <div className="flex gap-2 mb-4">
+                 <div className="relative flex-1">
+                    {/* Input: Light: bg-white border-slate-200 text-slate-900. Dark: bg-slate-800 border-slate-700 text-slate-200 */}
+                    <Input 
+                      value={customDx} 
+                      onChange={e => setCustomDx(e.target.value)} 
+                      placeholder="[CIE-10] – Nombre del diagnóstico..." 
+                      onKeyDown={e => e.key==='Enter' && addDx(customDx)} 
+                      className="pr-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                    />
+                    <button 
+                      onClick={() => toggleVoice('dx')} 
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 dark:hover:text-white ${isRecording ? 'text-red-500 animate-pulse' : ''}`}
+                    >
+                      <Mic size={18}/>
+                    </button>
+                 </div>
+                 <button 
+                   onClick={() => addDx(customDx)} 
+                   className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl w-14 flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
+                 >
+                   <Plus size={24}/>
+                 </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                 {DX_PRESETS.map(preset => (
+                    /* Preset Button: Light: bg-white border-slate-200 text-slate-600. Dark: bg-slate-800 border-slate-700 text-slate-300 */
+                    <button 
+                      key={preset.code} 
+                      onClick={() => addDx(`${preset.code} - ${preset.label}`)}
+                      className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <Plus size={10}/> {preset.code}
+                    </button>
+                 ))}
+              </div>
             </div>
-            <div><Label>Plan de Manejo</Label><TextArea rows={6} value={form.plan} onChange={e => updateForm('plan', e.target.value)} /></div>
-            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800"><SectionTitle><Wand2 size={20}/> Autocompletar Automático</SectionTitle>
-              <TextArea rows={4} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pega texto médico aquí..." className="mb-3" />
-              <button onClick={handleSmartFill} disabled={isImporting} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">{isImporting ? <Loader2 className="animate-spin"/> : <Wand2/>} Rellenar campos</button>
+
+            {/* Pronostico */}
+            <div>
+               <Label>Pronóstico</Label>
+               {/* Container: Light: bg-slate-100 border-slate-200. Dark: bg-slate-900 border-slate-800 */}
+               <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {PRONOSTICO_OPTS.map(opt => (
+                     <button
+                       key={opt}
+                       onClick={() => updateForm('pronostico', opt)}
+                       className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                        form.pronostico === opt 
+                        ? 'bg-emerald-600 text-white shadow-md transform scale-[1.02]' 
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/60'
+                       }`}
+                     >
+                       {opt}
+                     </button>
+                  ))}
+               </div>
+            </div>
+
+            {/* Plan de Tratamiento */}
+            <div>
+              <Label>Plan de Tratamiento</Label>
+              {/* Textarea: Light: bg-white border-slate-200. Dark: bg-slate-800 border-slate-700 */}
+              <TextArea 
+                rows={8} 
+                value={form.plan} 
+                onChange={e => updateForm('plan', e.target.value)} 
+                placeholder="1. Dieta... 2. Soluciones... 3. Meds..."
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 font-mono text-sm"
+              />
+            </div>
+            
+            {/* Smart Fill Card */}
+            {/* Card: Light: bg-slate-50 border-slate-200. Dark: bg-slate-950 border-slate-800 */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mt-4 transition-colors">
+              <h4 className="text-emerald-600 dark:text-emerald-400 font-bold mb-2 flex items-center gap-2">
+                <Wand2 size={18}/> Autocompletar Automático
+              </h4>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mb-4 leading-relaxed">
+                Pega aquí una nota de texto desordenada o información del paciente. El sistema extraerá los datos y rellenará los campos del formulario automáticamente.
+              </p>
+              
+              <div className="relative mb-4">
+                {/* Textarea: Light: bg-white border-slate-200. Dark: bg-slate-900 border-slate-700 */}
+                <TextArea 
+                  rows={4} 
+                  value={importText} 
+                  onChange={e => setImportText(e.target.value)} 
+                  placeholder="Ej: Paciente masculino de 45 años, acude por dolor abdominal de 3 días..." 
+                  className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-600 text-sm pr-10 shadow-sm"
+                />
+                 <button 
+                  onClick={() => toggleVoice('import')} 
+                  className={`absolute right-3 top-3 text-slate-400 hover:text-emerald-600 dark:text-slate-500 dark:hover:text-emerald-400 ${isRecording ? 'text-red-500 animate-pulse' : ''}`}
+                >
+                  <Mic size={18}/>
+                </button>
+              </div>
+
+              <button 
+                onClick={handleSmartFill} 
+                disabled={isImporting} 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} 
+                Rellenar Formulario
+              </button>
             </div>
           </div>
         );
@@ -355,7 +716,12 @@ export default function App() {
     <div className="app-bg min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans">
       <AuroraStyles />
       <div className="bg-emerald-600 dark:bg-emerald-950 sticky top-0 z-40 px-4 py-6 flex justify-between items-center shadow-lg border-b border-transparent dark:border-emerald-900">
-         <div className="flex items-center gap-3"><div className="bg-white/20 text-white p-2 rounded-lg"><Stethoscope size={24}/></div><div><h1 className="font-bold text-xl text-white">Nota de Ingreso Hospitalario</h1><p className="text-[10px] text-emerald-100 opacity-80">By Dr. Gabriel Mendez</p></div></div>
+         <div className="flex items-center gap-3">
+           <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 text-white p-2 rounded-lg hover:bg-white/30 transition-colors cursor-pointer">
+             <Stethoscope size={24}/>
+           </button>
+           <div><h1 className="font-bold text-xl text-white">Nota de Ingreso Hospitalario</h1><p className="text-[10px] text-emerald-100 opacity-80">By Dr. Gabriel Mendez</p></div>
+         </div>
          <div className="flex gap-2">
            <button onClick={() => setShowQr(true)} className="p-2 text-white hover:bg-white/10 rounded-full" title="Ver código QR"><QrCode size={20}/></button>
            <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/10 rounded-full">{isProcessing ? <Loader2 className="animate-spin" /> : <Sparkles size={20}/>}</button>
@@ -396,6 +762,33 @@ export default function App() {
               </p>
            </div>
         </div>
+      )}
+
+      {showDisclaimer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 max-w-md w-full border border-slate-200 dark:border-slate-700">
+                <div className="flex justify-between w-full mb-4">
+                   <h3 className="font-bold text-lg dark:text-white flex items-center gap-2"><AlertTriangle size={20} className="text-amber-500"/> Aviso Legal</h3>
+                   <button onClick={() => setShowDisclaimer(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed text-justify">
+                  <p>
+                    Esta aplicación fue creada como herramienta de <strong>enseñanza y entrenamiento clínico</strong>, diseñada para reforzar la correcta elaboración de notas de ingreso hospitalario.
+                  </p>
+                  <p>
+                    Se apega a estándares internacionales y normativos del expediente clínico, pero <strong>no reemplaza la evaluación médica integral ni el criterio profesional.</strong>
+                  </p>
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 font-medium">
+                    El usuario es responsable del uso adecuado de la información generada.
+                    <br/>
+                    Utilízala para aprender, mejorar y brindar una atención médica de calidad.
+                  </div>
+                </div>
+                <button onClick={() => setShowDisclaimer(false)} className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-colors">
+                  Entendido
+                </button>
+             </div>
+          </div>
       )}
     </div>
   );

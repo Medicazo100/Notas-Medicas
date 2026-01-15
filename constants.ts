@@ -17,6 +17,27 @@ export const SIGNOS_UNITS: Record<string, string> = { ta: 'mmHg', fc: 'lpm', fr:
 export const SIGNOS_ORDER = ['ta', 'fc', 'fr', 'temp', 'sat', 'gluc', 'peso', 'talla', 'imc'];
 export const ANTECEDENTES_OPTS = ['DM2', 'HAS', 'EPOC/Asma', 'Cáncer', 'Ninguno'];
 
+// Botones rápidos de diagnóstico basados en la imagen
+export const DX_PRESETS = [
+  { code: 'R10.4', label: 'Dolor abdominal' },
+  { code: 'J18.9', label: 'Neumonía' },
+  { code: 'I21.9', label: 'IAM' },
+  { code: 'A09', label: 'Gastroenteritis' },
+  { code: 'I10', label: 'Hipertensión' },
+  { code: 'E11.9', label: 'DM2' },
+  { code: 'S06.9', label: 'Traumatismo craneal' },
+  { code: 'N39.0', label: 'IVU' },
+  { code: 'E87.8', label: 'Desequilibrio hidroel.' },
+  { code: 'D64.9', label: 'Anemia' },
+  { code: 'K92.2', label: 'Hemorragia GI' },
+  { code: 'N18.0', label: 'Insuf. Renal' },
+  { code: 'I63.x', label: 'EVC Isquémico' },
+  { code: 'I61.x', label: 'EVC Hemorrágico' },
+  { code: 'I64', label: 'EVC No esp.' }
+];
+
+export const PRONOSTICO_OPTS = ['Bueno', 'Regular', 'Malo', 'Reservado'];
+
 export const SUGERENCIAS_DX = [
   'R10.4 – Otros dolores abdominales y los no especificados',
   'J18.9 – Neumonía, no especificada', 
@@ -24,15 +45,7 @@ export const SUGERENCIAS_DX = [
   'A09 – Diarrea y gastroenteritis de presunto origen infeccioso', 
   'I10 – Hipertensión esencial (primaria)', 
   'E11.9 – Diabetes mellitus tipo 2 sin complicaciones', 
-  'S06.9 – Traumatismo intracraneal, no especificado', 
-  'N39.0 – Infección de vías urinarias, sitio no especificado',
-  'E87.8 – Otros trastornos de los electrolitos y líquidos',
-  'D64.9 – Anemia no especificada (Hb < 9.6 g/dL)',
-  'K92.2 – Hemorragia gastrointestinal, no especificada',
-  'N18.0 – Enfermedad renal crónica (ERC)',
-  'I63.x – EVC Isquémico',
-  'I61.x – EVC Hemorrágico',
-  'I64 – Accidente vascular cerebral, no especificado como hemorrágico o isquémico'
+  'S06.9 – Traumatismo intracraneal, no especificado'
 ];
 
 export const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
