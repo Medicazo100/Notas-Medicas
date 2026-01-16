@@ -8,7 +8,7 @@ export const AuroraStyles = () => (
     .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     
-    .dark .app-bg { background: #020617; /* Slate 950 */ }
+    .dark .app-bg { background: #001e1a; /* Deep Cyberpunk Green */ }
     .dark .glass { background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid rgba(255,255,255,0.05); }
     
     /* Utility for printing */

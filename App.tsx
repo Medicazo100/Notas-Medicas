@@ -757,15 +757,15 @@ export default function App() {
   return (
     <div className="app-bg min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans">
       <AuroraStyles />
-      <div className="bg-emerald-600 dark:bg-[#00ff9d] sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-md border-b border-white/10 dark:border-black/10 transition-all duration-300">
+      <div className="bg-emerald-600 dark:bg-[#00d2ff] sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-md border-b border-white/10 dark:border-black/10 transition-all duration-300">
           <div className="flex items-center gap-2">
-              <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 dark:bg-black/10 text-white dark:text-slate-900 p-2 rounded-xl hover:bg-white/30 dark:hover:bg-black/20 transition-colors shadow-sm">
+              <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 dark:bg-black/10 text-white dark:text-slate-950 p-2 rounded-xl hover:bg-white/30 dark:hover:bg-black/20 transition-colors shadow-sm">
                   <Stethoscope size={24}/>
               </button>
               <div className="flex flex-col">
                    <h1 className="font-bold text-base leading-4 text-white dark:text-slate-900">Nota de Ingreso</h1>
                    <h1 className="font-bold text-base leading-4 text-white dark:text-slate-900">Hospitalario</h1>
-                   <p className="text-[10px] text-emerald-50 dark:text-slate-800 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+                   <p className="text-[10px] text-emerald-50 dark:text-slate-900 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
               </div>
           </div>
           <div className="flex gap-0.5">
@@ -775,7 +775,7 @@ export default function App() {
               <button onClick={() => setShowHistory(true)} className="p-1.5 text-white dark:text-slate-900 hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors"><Archive size={22}/></button>
           </div>
       </div>
-      <div className="bg-blue-500 dark:bg-slate-950 px-4 pt-6 pb-12 shadow-sm relative z-20"><div className="flex justify-between max-w-lg mx-auto">{STEPS_CONFIG.map(s => <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer"><div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}><s.icon size={22}/></div><span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-blue-100/60'}`}>{s.label}</span></div>)}</div></div>
+      <div className="bg-blue-500 dark:bg-[#064e3b] px-4 pt-6 pb-12 shadow-sm relative z-20"><div className="flex justify-between max-w-lg mx-auto">{STEPS_CONFIG.map(s => <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer"><div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}><s.icon size={22}/></div><span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-emerald-100/60'}`}>{s.label}</span></div>)}</div></div>
       <main className="px-4 -mt-6 relative z-30"><div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 shadow-2xl max-w-3xl mx-auto min-h-[60vh] flex flex-col justify-between">
           {renderStep()}
           <div className="flex justify-between mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 items-center">
