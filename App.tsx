@@ -6,7 +6,7 @@ import {
   AlertOctagon, BookOpen, Activity, Camera, ScanLine
 } from 'lucide-react';
 import QRCode from "react-qr-code";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 import { AuroraStyles } from './components/AuroraStyles';
 import { SectionTitle, Label, Input, Select, TextArea } from './components/UIComponents';
@@ -76,49 +76,69 @@ export default function App() {
 
   // Scanner Effect
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
     if (isScanning && showDataQr) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        if (!scannerRef.current) {
+      // Small delay to ensure DOM element 'reader' is rendered
+      timer = setTimeout(() => {
+        const element = document.getElementById("reader");
+        if (!element || scannerRef.current) return;
+
+        try {
+          // Initialize scanner
           const scanner = new Html5QrcodeScanner(
             "reader",
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            false
+            { 
+              fps: 10, 
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0,
+              showTorchButtonIfSupported: true,
+              rememberLastUsedCamera: true
+            },
+            false // verbose
           );
           
-          scanner.render((decodedText) => {
-             try {
-               const data = JSON.parse(decodedText);
-               // Simple validation check
-               if (data && typeof data === 'object' && 'nombre' in data) {
-                 setForm(prev => ({...prev, ...data}));
-                 showToast('Datos importados correctamente');
-                 setIsScanning(false);
-                 setShowDataQr(false);
-                 scanner.clear();
-               } else {
-                 showToast('QR inválido: No contiene datos de paciente');
-               }
-             } catch (e) {
-               showToast('Error al leer QR');
-             }
-          }, (error) => {
-             // Ignore read errors
-          });
           scannerRef.current = scanner;
+
+          scanner.render(
+            (decodedText) => {
+               try {
+                 const data = JSON.parse(decodedText);
+                 // Validation: check if it looks like patient data
+                 if (data && typeof data === 'object') {
+                   setForm(prev => ({...prev, ...data}));
+                   showToast('Datos importados correctamente');
+                   
+                   // Close scanner immediately upon success
+                   setIsScanning(false);
+                   setShowDataQr(false);
+                 } else {
+                   // Silent fail for non-json or non-matching data, or show specific error
+                 }
+               } catch (e) {
+                 // Not valid JSON, ignore
+               }
+            }, 
+            (error) => {
+               // Scanning error (e.g. no QR code found in frame), ignore
+            }
+          );
+        } catch (err) {
+          console.error("Failed to initialize scanner", err);
+          showToast("No se pudo iniciar la cámara");
         }
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
-      }
-    }
-    
+      }, 300);
+    } 
+
+    // Cleanup function
     return () => {
+       clearTimeout(timer);
        if (scannerRef.current) {
-         scannerRef.current.clear().catch(console.error);
+         try {
+           scannerRef.current.clear().catch(err => console.warn("Scanner cleanup warning:", err));
+         } catch (e) {
+           console.error("Scanner cleanup error:", e);
+         }
          scannerRef.current = null;
        }
     };
