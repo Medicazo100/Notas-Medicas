@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Mic, Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
   Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
-  AlertOctagon, BookOpen, Activity, Camera, ScanLine
+  AlertOctagon, BookOpen, Activity
 } from 'lucide-react';
-import QRCode from "react-qr-code";
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 import { AuroraStyles } from './components/AuroraStyles';
 import { SectionTitle, Label, Input, Select, TextArea } from './components/UIComponents';
@@ -21,9 +19,7 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [showQr, setShowQr] = useState(false); // App Share QR
-  const [showDataQr, setShowDataQr] = useState(false); // Data Transfer QR
-  const [isScanning, setIsScanning] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<AiAnalysisResult | null>(null);
@@ -39,9 +35,6 @@ export default function App() {
   const [customAntecedente, setCustomAntecedente] = useState('');
   const [customDx, setCustomDx] = useState('');
   
-  // Scanner Ref
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-
   useEffect(() => {
     StorageService.clearDraft();
     setNotes(StorageService.getNotes());
@@ -73,76 +66,6 @@ export default function App() {
     const { o, v, m } = form.g;
     setGlasgowTotal((parseInt(String(o))||0) + (parseInt(String(v))||0) + (parseInt(String(m))||0));
   }, [form.g]);
-
-  // Scanner Effect
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-
-    if (isScanning && showDataQr) {
-      // Small delay to ensure DOM element 'reader' is rendered
-      timer = setTimeout(() => {
-        const element = document.getElementById("reader");
-        if (!element || scannerRef.current) return;
-
-        try {
-          // Initialize scanner
-          const scanner = new Html5QrcodeScanner(
-            "reader",
-            { 
-              fps: 10, 
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0,
-              showTorchButtonIfSupported: true,
-              rememberLastUsedCamera: true
-            },
-            false // verbose
-          );
-          
-          scannerRef.current = scanner;
-
-          scanner.render(
-            (decodedText) => {
-               try {
-                 const data = JSON.parse(decodedText);
-                 // Validation: check if it looks like patient data
-                 if (data && typeof data === 'object') {
-                   setForm(prev => ({...prev, ...data}));
-                   showToast('Datos importados correctamente');
-                   
-                   // Close scanner immediately upon success
-                   setIsScanning(false);
-                   setShowDataQr(false);
-                 } else {
-                   // Silent fail for non-json or non-matching data, or show specific error
-                 }
-               } catch (e) {
-                 // Not valid JSON, ignore
-               }
-            }, 
-            (error) => {
-               // Scanning error (e.g. no QR code found in frame), ignore
-            }
-          );
-        } catch (err) {
-          console.error("Failed to initialize scanner", err);
-          showToast("No se pudo iniciar la cámara");
-        }
-      }, 300);
-    } 
-
-    // Cleanup function
-    return () => {
-       clearTimeout(timer);
-       if (scannerRef.current) {
-         try {
-           scannerRef.current.clear().catch(err => console.warn("Scanner cleanup warning:", err));
-         } catch (e) {
-           console.error("Scanner cleanup error:", e);
-         }
-         scannerRef.current = null;
-       }
-    };
-  }, [isScanning, showDataQr]);
 
   const updateForm = (field: keyof PatientForm, val: any) => setForm(prev => ({ ...prev, [field]: val }));
   
@@ -858,22 +781,20 @@ export default function App() {
           <div className="flex justify-between mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 items-center">
              <button onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} className="flex items-center gap-2 text-slate-400 disabled:opacity-30 hover:text-emerald-600 font-medium transition-colors"><ChevronLeft size={20}/> Atrás</button>
              {step < 5 ? (<button onClick={() => setStep(step + 1)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transform hover:scale-105 transition-all">Siguiente <ChevronRight size={18}/></button>) : (
-               <div className="flex gap-3 w-full sm:w-auto justify-end">
-                 {/* Word */}
-                 <button onClick={downloadWord} title="Descargar Word" className="p-3 border-2 border-emerald-600 text-emerald-600 rounded-xl font-bold transition-transform hover:scale-105 shadow-sm">
-                    <Download size={20}/>
+               <div className="flex gap-4">
+                 <button 
+                   onClick={downloadWord} 
+                   className="w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-100 dark:border-emerald-900 hover:border-emerald-500 dark:hover:border-emerald-500 shadow-lg shadow-emerald-900/5 hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-1 active:scale-95"
+                   title="Descargar documento Word"
+                 >
+                   <Download size={24} strokeWidth={2.5} />
                  </button>
-                 {/* WhatsApp */}
-                 <button onClick={handleWhatsApp} title="Compartir WhatsApp" className="p-3 bg-emerald-600 text-white rounded-xl font-bold transition-transform hover:scale-105 shadow-md">
-                    <Share2 size={20}/>
-                 </button>
-                 {/* Generate QR */}
-                 <button onClick={() => { setShowDataQr(true); setIsScanning(false); }} title="Generar QR de Paciente" className="p-3 bg-slate-700 text-white rounded-xl font-bold transition-transform hover:scale-105 shadow-md border border-slate-600">
-                    <QrCode size={20}/>
-                 </button>
-                 {/* Scan QR */}
-                 <button onClick={() => { setShowDataQr(true); setIsScanning(true); }} title="Escanear QR" className="p-3 bg-indigo-600 text-white rounded-xl font-bold transition-transform hover:scale-105 shadow-md border border-indigo-500">
-                     <ScanLine size={20}/>
+                 <button 
+                   onClick={handleWhatsApp} 
+                   className="w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:-translate-y-1 active:scale-95"
+                   title="Compartir por WhatsApp"
+                 >
+                   <Share2 size={24} strokeWidth={2.5} />
                  </button>
                </div>
              )}
@@ -975,7 +896,6 @@ export default function App() {
 
       {showHistory && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-4 max-h-[70vh] flex flex-col"><div className="flex justify-between items-center mb-4 border-b pb-2"><h3 className="font-bold">Historial</h3><button onClick={() => setShowHistory(false)}><X/></button></div><div className="flex-1 overflow-y-auto space-y-2">{notes.length===0 ? <p className="text-center text-slate-400 py-8">Vacio</p> : notes.map(n => <div key={n.id} className="p-3 border rounded-lg flex justify-between items-center"><div className="text-sm font-bold">{n.form.nombre || 'Sin nombre'}</div><div className="flex gap-2"><button onClick={() => { setForm(n.form); setShowHistory(false); showToast('Cargado'); }} className="p-1 text-blue-500"><FileUp size={16}/></button><button onClick={() => setNotes(StorageService.deleteNote(n.id))} className="p-1 text-red-500"><Trash2 size={16}/></button></div></div>)}</div></div></div>}
       
-      {/* App Share QR Modal */}
       {showQr && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 max-w-sm w-full border border-slate-200 dark:border-slate-700">
@@ -993,62 +913,6 @@ export default function App() {
               <p className="mt-4 text-sm text-center text-slate-500 dark:text-slate-400">
                 Escanea este código para abrir la aplicación en tu dispositivo móvil.
               </p>
-           </div>
-        </div>
-      )}
-
-      {/* NEW: Data Transfer QR Modal (Generate + Scan) */}
-      {showDataQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 max-w-md w-full border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between w-full mb-4 items-center">
-                 <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
-                   <ScanLine size={24} className="text-emerald-500"/> Transferir Paciente
-                 </h3>
-                 <button onClick={() => { setShowDataQr(false); setIsScanning(false); }} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
-              </div>
-              
-              {!isScanning ? (
-                <>
-                  <div className="bg-white p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-lg mb-4">
-                    <QRCode 
-                        value={JSON.stringify(form, (k, v) => {
-                            // Removing signature (too big) and empty/null values to fit QR capacity
-                            if (k === 'firmaDataURL') return undefined; 
-                            if (v === "" || v === null) return undefined;
-                            if (Array.isArray(v) && v.length === 0) return undefined;
-                            return v;
-                        })} 
-                        size={256}
-                        level="L"
-                    />
-                  </div>
-                  <p className="text-sm text-center text-slate-600 dark:text-slate-300 mb-6 font-medium">
-                    Muestra este código a otro dispositivo para transferir la información completa del paciente.
-                  </p>
-                  
-                  <div className="w-full border-t border-slate-200 dark:border-slate-800 pt-6">
-                     <p className="text-xs text-center text-slate-400 uppercase font-bold mb-3">O escanear para recibir</p>
-                     <button 
-                       onClick={() => setIsScanning(true)}
-                       className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg border border-slate-700"
-                     >
-                       <Camera size={20}/> Activar Escáner
-                     </button>
-                  </div>
-                </>
-              ) : (
-                <div className="w-full flex flex-col items-center">
-                   <div id="reader" className="w-full bg-black rounded-xl overflow-hidden border-2 border-emerald-500 mb-4 h-[300px]"></div>
-                   <p className="text-xs text-center text-emerald-500 animate-pulse font-bold mb-4">Buscando código QR de paciente...</p>
-                   <button 
-                     onClick={() => setIsScanning(false)}
-                     className="px-6 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-sm"
-                   >
-                     Cancelar Escaneo
-                   </button>
-                </div>
-              )}
            </div>
         </div>
       )}
