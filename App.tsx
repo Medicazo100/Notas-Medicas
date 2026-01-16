@@ -757,19 +757,23 @@ export default function App() {
   return (
     <div className="app-bg min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans">
       <AuroraStyles />
-      <div className="bg-emerald-600 dark:bg-emerald-950 sticky top-0 z-40 px-4 py-6 flex justify-between items-center shadow-lg border-b border-transparent dark:border-emerald-900">
-         <div className="flex items-center gap-3">
-           <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 text-white p-2 rounded-lg hover:bg-white/30 transition-colors cursor-pointer">
-             <Stethoscope size={24}/>
-           </button>
-           <div><h1 className="font-bold text-xl text-white">Nota de Ingreso Hospitalario</h1><p className="text-[10px] text-emerald-100 opacity-80">By Dr. Gabriel Mendez</p></div>
-         </div>
-         <div className="flex gap-2">
-           <button onClick={() => setShowQr(true)} className="p-2 text-white hover:bg-white/10 rounded-full" title="Ver código QR"><QrCode size={20}/></button>
-           <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/10 rounded-full">{isProcessing ? <Loader2 className="animate-spin" /> : <Sparkles size={20}/>}</button>
-           <button onClick={() => setDark(!dark)} className="p-2 text-white">{dark ? <Sun size={20}/> : <Moon size={20}/>}</button>
-           <button onClick={() => setShowHistory(true)} className="p-2 text-white"><Archive size={20}/></button>
-         </div>
+      <div className="bg-emerald-600 dark:bg-slate-950 sticky top-0 z-50 px-4 py-2 flex justify-between items-center shadow-md border-b border-white/10 transition-all">
+          <div className="flex items-center gap-3">
+              <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 text-white p-2 rounded-xl hover:bg-white/30 transition-colors shadow-sm">
+                  <Stethoscope size={20}/>
+              </button>
+              <div className="flex flex-col">
+                   <h1 className="font-bold text-sm leading-tight text-white">Nota de Ingreso</h1>
+                   <h1 className="font-bold text-sm leading-tight text-white">Hospitalario</h1>
+                   <p className="text-[9px] text-emerald-50 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+              </div>
+          </div>
+          <div className="flex gap-0.5">
+              <button onClick={() => setShowQr(true)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"><QrCode size={18}/></button>
+              <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors">{isProcessing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18}/>}</button>
+              <button onClick={() => setDark(!dark)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors">{dark ? <Sun size={18}/> : <Moon size={18}/>}</button>
+              <button onClick={() => setShowHistory(true)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"><Archive size={18}/></button>
+          </div>
       </div>
       <div className="bg-blue-500 dark:bg-slate-950 px-4 pt-6 pb-12 shadow-sm relative z-20"><div className="flex justify-between max-w-lg mx-auto">{STEPS_CONFIG.map(s => <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer"><div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}><s.icon size={22}/></div><span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-blue-100/60'}`}>{s.label}</span></div>)}</div></div>
       <main className="px-4 -mt-6 relative z-30"><div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 shadow-2xl max-w-3xl mx-auto min-h-[60vh] flex flex-col justify-between">
