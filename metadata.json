@@ -2,6 +2,7 @@
   "name": "Nota de Ingreso Hospitalario By Dr. Gabriel Mendez 1lineVercel",
   "description": "Generador de notas médicas de ingreso con asistencia automatizada, cálculo de signos vitales, y exportación a Word.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }
