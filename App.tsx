@@ -757,22 +757,22 @@ export default function App() {
   return (
     <div className="app-bg min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans">
       <AuroraStyles />
-      <div className="bg-emerald-600 dark:bg-slate-950 sticky top-0 z-50 px-4 py-2 flex justify-between items-center shadow-md border-b border-white/10 transition-all">
-          <div className="flex items-center gap-3">
+      <div className="bg-emerald-600 dark:bg-slate-950 sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-md border-b border-white/10 transition-all">
+          <div className="flex items-center gap-2">
               <button onClick={() => setShowDisclaimer(true)} className="bg-white/20 text-white p-2 rounded-xl hover:bg-white/30 transition-colors shadow-sm">
-                  <Stethoscope size={28}/>
+                  <Stethoscope size={24}/>
               </button>
               <div className="flex flex-col">
-                   <h1 className="font-bold text-lg leading-5 text-white">Nota de Ingreso</h1>
-                   <h1 className="font-bold text-lg leading-5 text-white">Hospitalario</h1>
-                   <p className="text-xs text-emerald-50 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+                   <h1 className="font-bold text-base leading-4 text-white">Nota de Ingreso</h1>
+                   <h1 className="font-bold text-base leading-4 text-white">Hospitalario</h1>
+                   <p className="text-[10px] text-emerald-50 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
               </div>
           </div>
-          <div className="flex gap-1">
-              <button onClick={() => setShowQr(true)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"><QrCode size={24}/></button>
-              <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors">{isProcessing ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24}/>}</button>
-              <button onClick={() => setDark(!dark)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors">{dark ? <Sun size={24}/> : <Moon size={24}/>}</button>
-              <button onClick={() => setShowHistory(true)} className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"><Archive size={24}/></button>
+          <div className="flex gap-0.5">
+              <button onClick={() => setShowQr(true)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors"><QrCode size={22}/></button>
+              <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors">{isProcessing ? <Loader2 className="animate-spin" size={22} /> : <Sparkles size={22}/>}</button>
+              <button onClick={() => setDark(!dark)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors">{dark ? <Sun size={22}/> : <Moon size={22}/>}</button>
+              <button onClick={() => setShowHistory(true)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors"><Archive size={22}/></button>
           </div>
       </div>
       <div className="bg-blue-500 dark:bg-slate-950 px-4 pt-6 pb-12 shadow-sm relative z-20"><div className="flex justify-between max-w-lg mx-auto">{STEPS_CONFIG.map(s => <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer"><div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}><s.icon size={22}/></div><span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-blue-100/60'}`}>{s.label}</span></div>)}</div></div>
