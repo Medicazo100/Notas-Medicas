@@ -61,11 +61,17 @@ export interface NoteEntry {
   form: PatientForm;
 }
 
+export interface DiagnosticoSug {
+  codigo: string;
+  nombre: string;
+  justificacion: string;
+}
+
 export interface AiAnalysisResult {
-  critique?: string[];
-  improvedMotivo?: string;
-  improvedPlan?: string;
-  differentialDx?: string[];
+  observaciones: string[];
+  padecimientoMedico: string;
+  diagnosticosSugeridos: DiagnosticoSug[];
+  planEstructurado: string;
 }
 
 // Extend Window for SpeechRecognition

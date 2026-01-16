@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Mic, Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
-  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye
+  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
+  AlertOctagon, BookOpen, Activity
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
@@ -109,7 +110,7 @@ export default function App() {
   };
 
   const handleSystemAnalysis = async (data = form) => {
-    if (data.padecimientoActual.length < 10) return showToast('Escribe más detalles en el padecimiento actual');
+    if (data.padecimientoActual.length < 5 && step > 1) return showToast('Escribe más detalles en el padecimiento actual');
     setIsProcessing(true);
     const result = await AiService.analyze(data);
     setIsProcessing(false);
@@ -140,13 +141,13 @@ export default function App() {
   const applySystemSuggestions = () => {
     if (!processingResult) return;
     setForm(prev => {
-      const combinedDx = processingResult.differentialDx 
-        ? Array.from(new Set([...prev.diagnostico, ...processingResult.differentialDx])) 
-        : prev.diagnostico;
+      const newDiagnoses = processingResult.diagnosticosSugeridos.map(d => `${d.codigo} - ${d.nombre}`);
+      const combinedDx = Array.from(new Set([...prev.diagnostico, ...newDiagnoses]));
+      
       return {
         ...prev,
-        padecimientoActual: processingResult.improvedMotivo || prev.padecimientoActual,
-        plan: processingResult.improvedPlan || prev.plan,
+        padecimientoActual: processingResult.padecimientoMedico || prev.padecimientoActual,
+        plan: processingResult.planEstructurado || prev.plan,
         diagnostico: combinedDx
       };
     });
@@ -234,16 +235,57 @@ export default function App() {
 
   const generateWhatsAppText = (data: PatientForm) => {
     const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
-    let text = `*NOTA DE INGRESO*\n\n`;
-    text += `*Paciente:* ${data.nombre} | *Edad:* ${data.edad}\n`;
-    text += `*Sínoma:* ${data.sintomaPrincipal}\n`;
-    text += `*Padecimiento:* ${data.padecimientoActual}\n\n`;
-    text += `*SIGNOS VITALES*\n`;
-    text += `TA: ${data.signos.ta} | FC: ${data.signos.fc} | Temp: ${data.signos.temp} | Sat: ${data.signos.sat}\n`;
-    text += `*Glasgow:* ${glasgow} | *Pupilas:* ${data.pupilas}\n\n`;
-    text += `*DIAGNÓSTICO*\n`;
+    
+    let text = `*REGISTRO MÉDICO COMPLETO*\n----------------------\n`;
+    
+    // 1. Identificación
+    text += `*FICHA DE IDENTIFICACIÓN*\n`;
+    if(data.folio) text += `Folio: ${data.folio}\n`;
+    text += `Paciente: ${data.nombre}\n`;
+    if(data.edad) text += `Edad: ${data.edad}\n`;
+    if(data.sexo) text += `Sexo: ${data.sexo}\n`;
+    if(data.fn) text += `Fecha Nac: ${data.fn}\n`;
+    if(data.estadoCivil) text += `E. Civil: ${data.estadoCivil}\n`;
+    if(data.escolaridad) text += `Escolaridad: ${data.escolaridad}\n`;
+    if(data.ocupacion) text += `Ocupación: ${data.ocupacion}\n`;
+    if(data.domicilio) text += `Domicilio: ${data.domicilio}\n`;
+    if(data.telefono) text += `Teléfono: ${data.telefono}\n`;
+    if(data.responsable) text += `Responsable: ${data.responsable}\n`;
+    
+    text += `\n*DATOS MÉDICO*\n`;
+    if(data.medicoTratante) text += `Dr(a): ${data.medicoTratante}\n`;
+    if(data.cedulaProfesional) text += `Cédula: ${data.cedulaProfesional}\n`;
+
+    // 2. Motivo
+    text += `\n*MOTIVO DE CONSULTA*\n`;
+    if(data.sintomaPrincipal) text += `Síntoma: ${data.sintomaPrincipal}\n`;
+    if(data.tiempoEvolucion) text += `Evolución: ${data.tiempoEvolucion}\n`;
+    text += `\n*PADECIMIENTO ACTUAL*\n${data.padecimientoActual}\n`;
+
+    // 3. Signos Vitales
+    text += `\n*SIGNOS VITALES*\n`;
+    text += `TA: ${data.signos.ta} | FC: ${data.signos.fc} | FR: ${data.signos.fr}\n`;
+    text += `Temp: ${data.signos.temp} | Sat: ${data.signos.sat} | Gluc: ${data.signos.gluc}\n`;
+    text += `Peso: ${data.signos.peso} | Talla: ${data.signos.talla} | IMC: ${data.signos.imc}\n`;
+    text += `Glasgow: ${glasgow} (O${data.g.o} V${data.g.v} M${data.g.m})\n`;
+    if(data.pupilas) text += `Pupilas: ${data.pupilas}\n`;
+
+    // 4. Antecedentes y Exploración
+    text += `\n*EXPLORACIÓN FÍSICA*\n${data.exploracion}\n`;
+
+    text += `\n*ANTECEDENTES*\n`;
+    if(data.antecedentes.length > 0) text += `Patológicos: ${data.antecedentes.join(', ')}\n`;
+    if(data.alergias) text += `Alergias: ${data.alergias}\n`;
+    text += `Tabaquismo: ${data.tabaquismo} | Alcohol: ${data.alcohol}\n`;
+
+    // 5. Diagnóstico y Plan
+    text += `\n*DIAGNÓSTICO*\n`;
     data.diagnostico.forEach(d => text += `• ${d}\n`);
-    text += `\n*PLAN:*\n${data.plan}`;
+    
+    if(data.pronostico) text += `Pronóstico: ${data.pronostico}\n`;
+    
+    text += `\n*PLAN DE TRATAMIENTO*\n${data.plan}`;
+    
     return text;
   };
 
@@ -740,7 +782,99 @@ export default function App() {
           </div>
       </div></main>
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce flex items-center gap-2 text-sm"><CheckCircle size={16} className="text-emerald-400"/> {toast}</div>}
-      {processingResult && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"><h3 className="font-bold text-indigo-600 mb-4 flex items-center gap-2"><Sparkles/> Análisis Automatizado</h3><div className="space-y-4 text-sm"><div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg"><b>Redacción sugerida:</b><p className="italic mt-1">"{processingResult.improvedMotivo}"</p></div><div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg"><b>Plan sugerido:</b><p className="mt-1">{processingResult.improvedPlan}</p></div></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setProcessingResult(null)} className="px-4 py-2 text-slate-500">Descartar</button><button onClick={applySystemSuggestions} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Aplicar cambios</button></div></div></div>}
+      
+      {/* IMPROVED AI RESULTS MODAL - Matching Screenshot Design */}
+      {processingResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+           <div className="bg-[#0f172a] w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 animate-in zoom-in-95">
+              
+              {/* Header */}
+              <div className="bg-[#1e293b] p-4 flex justify-between items-center border-b border-slate-700">
+                <h3 className="font-bold text-lg text-indigo-400 flex items-center gap-2">
+                  <Sparkles className="text-indigo-500" size={20} /> Análisis Clínico Automatizado
+                </h3>
+                <button onClick={() => setProcessingResult(null)} className="text-slate-400 hover:text-white transition-colors">
+                  <X size={20}/>
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-6 space-y-6 text-slate-300 custom-scrollbar">
+                
+                {/* 1. OBSERVACIONES - Amber Alert Style */}
+                {processingResult.observaciones && processingResult.observaciones.length > 0 && (
+                  <div className="border border-amber-900/50 bg-amber-950/20 rounded-xl overflow-hidden">
+                     <div className="bg-amber-900/30 px-4 py-2 border-b border-amber-900/50 flex items-center gap-2">
+                        <AlertOctagon size={16} className="text-amber-500"/>
+                        <span className="font-bold text-amber-500 text-sm uppercase tracking-wide">Observaciones Críticas</span>
+                     </div>
+                     <ul className="p-4 space-y-2">
+                       {processingResult.observaciones.map((obs, i) => (
+                         <li key={i} className="flex gap-2 text-sm text-amber-100/80">
+                           <span className="text-amber-500 mt-1.5">•</span>
+                           <span>{obs}</span>
+                         </li>
+                       ))}
+                     </ul>
+                  </div>
+                )}
+
+                {/* 2. PADECIMIENTO - Blue Info Style */}
+                <div className="border border-blue-900/50 bg-blue-950/20 rounded-xl overflow-hidden">
+                   <div className="bg-blue-900/30 px-4 py-2 border-b border-blue-900/50 flex items-center gap-2">
+                      <BookOpen size={16} className="text-blue-400"/>
+                      <span className="font-bold text-blue-400 text-sm uppercase tracking-wide">Padecimiento Sugerido</span>
+                   </div>
+                   <div className="p-4 text-sm text-blue-100/90 leading-relaxed italic">
+                      "{processingResult.padecimientoMedico}"
+                   </div>
+                </div>
+
+                {/* 3. DIAGNOSTICOS - Grid of Cards */}
+                <div>
+                   <h4 className="text-indigo-400 text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2">
+                     <Activity size={16}/> Posibles Diagnósticos
+                   </h4>
+                   <div className="space-y-3">
+                      {processingResult.diagnosticosSugeridos.map((dx, i) => (
+                        <div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-indigo-500/50 transition-colors">
+                           <div className="flex items-center gap-2 mb-1">
+                              <span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs font-bold font-mono">
+                                {dx.codigo}
+                              </span>
+                              <span className="font-bold text-slate-200 text-sm">{dx.nombre}</span>
+                           </div>
+                           <p className="text-xs text-slate-400 pl-1">{dx.justificacion}</p>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                {/* 4. PLAN - Pre-wrap Text */}
+                <div className="border border-slate-700 bg-slate-800/30 rounded-xl overflow-hidden">
+                   <div className="bg-slate-800/80 px-4 py-2 border-b border-slate-700 flex items-center gap-2">
+                      <ClipboardPlus size={16} className="text-emerald-400"/>
+                      <span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">Plan Sugerido</span>
+                   </div>
+                   <div className="p-4 text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                      {processingResult.planEstructurado}
+                   </div>
+                </div>
+
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-4 bg-[#1e293b] border-t border-slate-700 flex justify-end gap-3">
+                 <button onClick={() => setProcessingResult(null)} className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">
+                   Cerrar
+                 </button>
+                 <button onClick={applySystemSuggestions} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/20 transition-all hover:scale-105">
+                   <Check size={16}/> Aplicar Cambios
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {showHistory && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-4 max-h-[70vh] flex flex-col"><div className="flex justify-between items-center mb-4 border-b pb-2"><h3 className="font-bold">Historial</h3><button onClick={() => setShowHistory(false)}><X/></button></div><div className="flex-1 overflow-y-auto space-y-2">{notes.length===0 ? <p className="text-center text-slate-400 py-8">Vacio</p> : notes.map(n => <div key={n.id} className="p-3 border rounded-lg flex justify-between items-center"><div className="text-sm font-bold">{n.form.nombre || 'Sin nombre'}</div><div className="flex gap-2"><button onClick={() => { setForm(n.form); setShowHistory(false); showToast('Cargado'); }} className="p-1 text-blue-500"><FileUp size={16}/></button><button onClick={() => setNotes(StorageService.deleteNote(n.id))} className="p-1 text-red-500"><Trash2 size={16}/></button></div></div>)}</div></div></div>}
       
       {showQr && (
