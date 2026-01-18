@@ -55,10 +55,49 @@ export interface PatientForm {
   firmaDataURL: string | null;
 }
 
+// Nueva interfaz para Nota de Evolución SOAP
+export interface EvolutionForm {
+  folio: string;
+  nombre: string;
+  edad: string;
+  sexo: string;
+  cama: string;
+  fechaIngreso: string; // Nuevo campo
+  fecha: string;
+  hora: string;
+  medico: string;
+  
+  // S - Subjetivo
+  subjetivo: string;
+  
+  // O - Objetivo
+  signos: Signos;
+  g: Glasgow;
+  pupilas: string; // Nuevo campo pupilas
+  resultadosLaboratorio: string;
+  exploracionFisica: string;
+  
+  // A - Análisis
+  diagnosticosIngreso: string[]; // Diagnósticos con los que llegó
+  diagnosticosActivos: string[]; // Nuevos o actuales
+  analisis: string;
+  pronostico: string;
+  pendientes: string; // Nuevo campo pendientes
+  
+  // P - Plan
+  planDieta: string;
+  planHidratacion: string;
+  planMedicamentos: string;
+  planCuidados: string;
+  planEstudios: string;
+  planIndicaciones: string;
+}
+
 export interface NoteEntry {
   id: number;
   date: string;
-  form: PatientForm;
+  type: 'ingreso' | 'evolucion';
+  form: PatientForm | EvolutionForm;
 }
 
 export interface DiagnosticoSug {
@@ -74,10 +113,8 @@ export interface AiAnalysisResult {
   planEstructurado: string;
 }
 
-// Extend Window for SpeechRecognition
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
+export interface AiEvolutionResult {
+  sugerenciasRedaccion: string;
+  analisisClinico: string;
+  alertas: string[];
 }

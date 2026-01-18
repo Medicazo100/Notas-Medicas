@@ -92,7 +92,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, initialData 
   };
 
   return (
-    <div className="relative border border-slate-300 dark:border-slate-600 rounded-lg bg-white w-full h-40 touch-none overflow-hidden shadow-sm">
+    <div className="relative border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white w-full h-40 touch-none overflow-hidden shadow-sm">
       <canvas 
         ref={canvasRef} 
         className="w-full h-full cursor-crosshair"

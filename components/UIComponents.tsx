@@ -13,15 +13,15 @@ export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 );
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => (
-  <input {...props} className={`w-full p-3 rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm text-[15px] ${props.className || ''}`} />
+  <input {...props} className={`w-full p-3 rounded-xl border-2 border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm text-[15px] ${props.className || ''}`} />
 );
 
 export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement>> = ({ children, ...props }) => (
-  <select {...props} className={`w-full p-3 rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm text-[15px] ${props.className || ''}`}>
+  <select {...props} className={`w-full p-3 rounded-xl border-2 border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm text-[15px] ${props.className || ''}`}>
     {children}
   </select>
 );
 
 export const TextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement>> = (props) => (
-  <textarea {...props} className={`w-full p-3 rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none shadow-sm text-[15px] ${props.className || ''}`} />
+  <textarea {...props} className={`w-full p-3 rounded-xl border-2 border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none shadow-sm text-[15px] ${props.className || ''}`} />
 );

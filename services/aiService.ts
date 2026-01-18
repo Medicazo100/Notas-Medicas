@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { PatientForm, AiAnalysisResult } from "../types";
+import { PatientForm, AiAnalysisResult, EvolutionForm, AiEvolutionResult } from "../types";
 
 export const AiService = {
   analyze: async (formData: PatientForm): Promise<AiAnalysisResult | null> => {
@@ -95,6 +95,35 @@ export const AiService = {
       console.error("Service Error:", error);
       return null;
     }
+  },
+
+  analyzeEvolution: async (evoData: EvolutionForm): Promise<AiEvolutionResult | null> => {
+    if (!process.env.API_KEY) return null;
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        sugerenciasRedaccion: { type: Type.STRING },
+        analisisClinico: { type: Type.STRING },
+        alertas: { type: Type.ARRAY, items: { type: Type.STRING } }
+      }
+    };
+
+    const prompt = `Analiza esta nota de evolución SOAP.
+    Datos: ${JSON.stringify(evoData)}.
+    Genera un análisis clínico profundo para el apartado 'Análisis' justificando la evolución del paciente.
+    Mejora la redacción del apartado 'Subjetivo'.
+    Detecta si hay inconsistencias graves.`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema: schema }
+      });
+      return response.text ? JSON.parse(response.text) : null;
+    } catch (e) { console.error(e); return null; }
   },
 
   parseData: async (textInput: string): Promise<Partial<PatientForm> | null> => {

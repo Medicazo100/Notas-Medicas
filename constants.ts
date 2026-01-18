@@ -1,5 +1,5 @@
-import { PatientForm } from './types';
-import { User, Stethoscope, HeartPulse, History, ClipboardPlus } from 'lucide-react';
+import { PatientForm, EvolutionForm } from './types';
+import { User, Stethoscope, HeartPulse, History, ClipboardPlus, Activity, FileText } from 'lucide-react';
 
 export const INITIAL_FORM: PatientForm = {
   folio: '', nombre: '', fn: '', edad: '', sexo: '', domicilio: '', telefono: '', 
@@ -12,10 +12,43 @@ export const INITIAL_FORM: PatientForm = {
   gpac: { g: 0, p: 0, a: 0, c: 0 }, diagnostico: [], pronostico: '', plan: '', firmaDataURL: null,
 };
 
+export const INITIAL_EVOLUTION_FORM: EvolutionForm = {
+  folio: '', nombre: '', edad: '', sexo: '', cama: '', fechaIngreso: '', fecha: '', hora: '', 
+  medico: 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204',
+  subjetivo: '',
+  signos: { ta: '', fc: '', fr: '', temp: '', sat: '', gluc: '', peso: '', talla: '', imc: '' },
+  g: { o: 4, v: 5, m: 6 },
+  pupilas: 'Isocóricas', // Valor por defecto
+  resultadosLaboratorio: '',
+  exploracionFisica: '',
+  diagnosticosIngreso: [], // Inicializar vacio
+  diagnosticosActivos: [], // Inicializar vacio
+  analisis: '',
+  pronostico: '',
+  pendientes: '', // Nuevo campo
+  planDieta: '',
+  planHidratacion: '',
+  planMedicamentos: '',
+  planCuidados: 'Signos vitales por turno y cuidados generales de enfermería.',
+  planEstudios: '',
+  planIndicaciones: ''
+};
+
 export const SIGNOS_LABELS: Record<string, string> = { ta: 'TA', fc: 'FC', fr: 'FR', temp: 'Temp', sat: 'SatO₂', gluc: 'Gluc', peso: 'Peso', talla: 'Talla', imc: 'IMC' };
 export const SIGNOS_UNITS: Record<string, string> = { ta: 'mmHg', fc: 'lpm', fr: 'rpm', temp: '°C', sat: '%', gluc: 'mg/dL', peso: 'kg', talla: 'cm', imc: '' };
 export const SIGNOS_ORDER = ['ta', 'fc', 'fr', 'temp', 'sat', 'gluc', 'peso', 'talla', 'imc'];
 export const ANTECEDENTES_OPTS = ['DM2', 'HAS', 'EPOC/Asma', 'Cáncer', 'Ninguno'];
+
+export const PENDIENTES_OPTS = [
+  'Laboratorios Control', 
+  'Imagen (Rx/TAC)', 
+  'Interconsulta', 
+  'Transfusión', 
+  'Cirugía', 
+  'Traslado', 
+  'Recabar Reportes',
+  'Valoración Cardio'
+];
 
 // Botones rápidos de diagnóstico basados en la imagen
 export const DX_PRESETS = [
@@ -65,5 +98,13 @@ export const STEPS_CONFIG = [
   { id: 2, label: 'Motivo', icon: Stethoscope },
   { id: 3, label: 'Signos', icon: HeartPulse },
   { id: 4, label: 'Anteced.', icon: History },
+  { id: 5, label: 'Plan', icon: ClipboardPlus },
+];
+
+export const EVOLUTION_STEPS = [
+  { id: 1, label: 'Datos', icon: User },
+  { id: 2, label: 'Subjetivo', icon: FileText },
+  { id: 3, label: 'Objetivo', icon: HeartPulse },
+  { id: 4, label: 'Análisis', icon: Activity },
   { id: 5, label: 'Plan', icon: ClipboardPlus },
 ];
