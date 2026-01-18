@@ -1056,6 +1056,12 @@ ${data.plan}`;
 
       {/* --- SELECTION SCREEN CONTENT --- */}
       {appMode === 'selection' && (
+         <>
+         <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+            <div className="stars-small"></div>
+            <div className="stars-medium"></div>
+            <div className="stars-large"></div>
+         </div>
          <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-60px)]">
              {/* Header */}
             <div className="max-w-3xl text-center mb-16 animate-in fade-in slide-in-from-top-10 duration-700">
@@ -1132,6 +1138,7 @@ ${data.plan}`;
                 </div>
             </div>
          </div>
+         </>
       )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce flex items-center gap-2 text-sm"><CheckCircle size={16} className="text-emerald-400"/> {toast}</div>}

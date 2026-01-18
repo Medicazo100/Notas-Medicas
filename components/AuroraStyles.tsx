@@ -45,7 +45,7 @@ export const AuroraStyles = () => {
         width: 1px; 
         height: 1px; 
         box-shadow: ${smallStars}; 
-        animation: animStar 150s linear infinite; 
+        animation: animStar 50s linear infinite; 
         opacity: 0.8;
       }
       
@@ -53,7 +53,7 @@ export const AuroraStyles = () => {
         width: 2px; 
         height: 2px; 
         box-shadow: ${mediumStars}; 
-        animation: animStar 200s linear infinite; 
+        animation: animStar 100s linear infinite; 
         opacity: 0.6;
       }
       
@@ -61,7 +61,7 @@ export const AuroraStyles = () => {
         width: 3px; 
         height: 3px; 
         box-shadow: ${largeStars}; 
-        animation: animStar 250s linear infinite; 
+        animation: animStar 150s linear infinite; 
         opacity: 0.4;
       }
 
