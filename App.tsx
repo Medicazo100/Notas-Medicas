@@ -11,7 +11,7 @@ import { SectionTitle, Label, Input, Select, TextArea } from './components/UICom
 import { AiService } from './services/aiService';
 import { StorageService } from './services/storageService';
 import { INITIAL_FORM, INITIAL_EVOLUTION_FORM, SIGNOS_ORDER, SIGNOS_LABELS, SIGNOS_UNITS, MONTHS, SEMIOLOGIA_TAGS, EXPLORACION_PLANTILLAS, ANTECEDENTES_OPTS, SUGERENCIAS_DX, DX_PRESETS, PRONOSTICO_OPTS, PENDIENTES_OPTS, STEPS_CONFIG, EVOLUTION_STEPS } from './constants';
-import { PatientForm, EvolutionForm, AiAnalysisResult, NoteEntry } from './types';
+import { PatientForm, EvolutionForm, AiAnalysisResult, NoteEntry, AiEvolutionResult } from './types';
 
 export default function App() {
   const [appMode, setAppMode] = useState<'selection' | 'admission' | 'evolution'>('selection');
@@ -30,7 +30,7 @@ export default function App() {
   const [showQr, setShowQr] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingResult, setProcessingResult] = useState<AiAnalysisResult | null>(null);
+  const [processingResult, setProcessingResult] = useState<AiAnalysisResult | AiEvolutionResult | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [glasgowTotal, setGlasgowTotal] = useState(15);
   const [dob, setDob] = useState({ d: '', m: '', y: '' });
@@ -49,11 +49,11 @@ export default function App() {
     setNotes(StorageService.getNotes());
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) setDark(true);
     
-    // Set default date/time for evolution note
+    // Set default date/time for evolution note on mount
     const now = new Date();
     setEvoForm(prev => ({
       ...prev,
-      fecha: now.toLocaleDateString('es-MX'), // Usar formato local
+      fecha: now.toLocaleDateString('es-MX'), 
       hora: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
     }));
   }, []);
@@ -89,9 +89,10 @@ export default function App() {
   // Manejo de médico predeterminado
   useEffect(() => {
     if (appMode === 'evolution') {
+        const defaultDoc = 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204';
         if (useDefaultDoctor) {
-            updateEvoForm('medico', 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204');
-        } else if (evoForm.medico === 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204') {
+            updateEvoForm('medico', defaultDoc);
+        } else if (evoForm.medico === defaultDoc) {
             updateEvoForm('medico', ''); // Limpiar si cambia a manual y estaba el default
         }
     }
@@ -145,24 +146,25 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSystemAnalysis = async (data = form) => {
+  const handleSystemAnalysis = async () => {
+    setIsProcessing(true);
     if (appMode === 'admission') {
-        if (data.padecimientoActual.length < 5 && step > 1) return showToast('Escribe más detalles en el padecimiento actual');
-        setIsProcessing(true);
-        const result = await AiService.analyze(data);
+        if (form.padecimientoActual.length < 5 && step > 1) {
+            setIsProcessing(false);
+            return showToast('Escribe más detalles en el padecimiento actual');
+        }
+        const result = await AiService.analyze(form);
         setIsProcessing(false);
         if (result) setProcessingResult(result);
         else showToast('No se pudo conectar con el sistema');
     } else {
-        setIsProcessing(true);
         const result = await AiService.analyzeEvolution(evoForm);
         setIsProcessing(false);
         if(result) {
-            setEvoForm(prev => ({
-                ...prev,
-                analisis: prev.analisis ? prev.analisis : result.analisisClinico,
-            }));
+            setProcessingResult(result);
             showToast('Análisis generado por IA');
+        } else {
+            showToast('No se pudo generar el análisis');
         }
     }
   };
@@ -170,38 +172,84 @@ export default function App() {
   const handleSmartFill = async () => {
     if (!importText.trim()) return showToast('Pega un texto primero');
     setIsImporting(true);
-    const parsedData = await AiService.parseData(importText);
-    setIsImporting(false);
 
-    if (parsedData) {
-      setForm(prev => ({
-        ...prev,
-        ...parsedData,
-        signos: { ...prev.signos, ...parsedData.signos },
-        g: { ...prev.g, ...parsedData.g }
-      }));
-      setImportText('');
-      showToast('Formulario autocompletado e integrado en todas las secciones');
+    if (appMode === 'admission') {
+        const parsedData = await AiService.parseData(importText);
+        setIsImporting(false);
+
+        if (parsedData) {
+          setForm(prev => ({
+            ...prev,
+            ...parsedData,
+            signos: { ...prev.signos, ...parsedData.signos },
+            g: { ...prev.g, ...parsedData.g }
+          }));
+          setImportText('');
+          showToast('Formulario autocompletado e integrado en todas las secciones');
+        } else {
+          showToast('Error al interpretar los datos');
+        }
     } else {
-      showToast('Error al interpretar los datos');
+        const parsedData = await AiService.parseEvolutionData(importText);
+        setIsImporting(false);
+
+        if (parsedData) {
+            setEvoForm(prev => ({
+                ...prev,
+                ...parsedData,
+                signos: { ...prev.signos, ...parsedData.signos },
+                g: { ...prev.g, ...parsedData.g }
+            }));
+            setImportText('');
+            showToast('Evolución autocompletada e integrada');
+        } else {
+            showToast('Error al interpretar los datos de evolución');
+        }
     }
   };
 
   const applySystemSuggestions = () => {
     if (!processingResult) return;
-    setForm(prev => {
-      const newDiagnoses = processingResult.diagnosticosSugeridos.map(d => `${d.codigo} - ${d.nombre}`);
-      const combinedDx = Array.from(new Set([...prev.diagnostico, ...newDiagnoses]));
-      
-      return {
-        ...prev,
-        padecimientoActual: processingResult.padecimientoMedico || prev.padecimientoActual,
-        plan: processingResult.planEstructurado || prev.plan,
-        diagnostico: combinedDx
-      };
-    });
+    
+    if (appMode === 'admission') {
+        const res = processingResult as AiAnalysisResult;
+        setForm(prev => {
+          const newDiagnoses = res.diagnosticosSugeridos.map(d => `${d.codigo} - ${d.nombre}`);
+          const combinedDx = Array.from(new Set([...prev.diagnostico, ...newDiagnoses]));
+          
+          return {
+            ...prev,
+            padecimientoActual: res.padecimientoMedico || prev.padecimientoActual,
+            plan: res.planEstructurado || prev.plan,
+            diagnostico: combinedDx
+          };
+        });
+        
+        // Guardar en historial automáticamente
+        saveToHistory();
+        showToast('Sugerencias aplicadas y guardadas en historial');
+
+    } else {
+        // Modo Evolución
+        const res = processingResult as AiEvolutionResult;
+        setEvoForm(prev => {
+            const newDiagnoses = res.diagnosticosSugeridos.map(d => `${d.codigo} - ${d.nombre}`);
+            const combinedDx = Array.from(new Set([...prev.diagnosticosActivos, ...newDiagnoses]));
+
+            return {
+                ...prev,
+                subjetivo: res.subjetivoMejorado || prev.subjetivo,
+                analisis: res.analisisClinico || prev.analisis,
+                plan: res.planSugerido || prev.plan,
+                diagnosticosActivos: combinedDx
+            };
+        });
+
+        // Guardar en historial automáticamente
+        saveToHistory();
+        showToast('Evolución actualizada y guardada en historial');
+    }
     setProcessingResult(null);
-    showToast('Sugerencias integradas correctamente');
   };
   
   const addAntecedente = (a: string) => { 
@@ -259,6 +307,30 @@ export default function App() {
     const updatedNotes = StorageService.saveNote(note);
     setNotes(updatedNotes);
     return updatedNotes;
+  };
+
+  // --- Header Component ---
+  const StepHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle: string }) => {
+     const isAdmission = appMode === 'admission';
+     return (
+        <div className={`mb-6 border-l-4 pl-5 py-3 rounded-r-2xl transition-colors shadow-sm ${
+            isAdmission 
+            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20' 
+            : 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'
+        }`}>
+            <h2 className={`text-2xl font-bold flex items-center gap-3 ${
+                isAdmission 
+                ? 'text-emerald-800 dark:text-emerald-300' 
+                : 'text-indigo-800 dark:text-indigo-300'
+            }`}>
+                <Icon size={28} className={isAdmission ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'} />
+                {title}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 font-medium ml-1">
+                {subtitle}
+            </p>
+        </div>
+     );
   };
 
   // --- Generador HTML Nota Ingreso ---
@@ -327,12 +399,18 @@ export default function App() {
                 <td style="border: 1px solid #ddd; padding: 5px;"><b>Cama/Exp:</b> ${data.folio} / ${data.cama}</td>
             </tr>
             <tr>
+                <td style="border: 1px solid #ddd; padding: 5px;"><b>Escolaridad:</b> ${data.escolaridad}</td>
+                <td style="border: 1px solid #ddd; padding: 5px;" colspan="2"><b>Ocupación:</b> ${data.ocupacion}</td>
+            </tr>
+            <tr>
                 <td style="border: 1px solid #ddd; padding: 5px;"><b>Fecha:</b> ${data.fecha}</td>
-                <td style="border: 1px solid #ddd; padding: 5px;"><b>Hora:</b> ${data.hora}</td>
-                <td style="border: 1px solid #ddd; padding: 5px;"><b>Ingreso:</b> ${data.fechaIngreso}</td>
+                <td style="border: 1px solid #ddd; padding: 5px;" colspan="2"><b>Hora:</b> ${data.hora}</td>
             </tr>
             <tr>
                  <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Estancia Hospitalaria:</b> ${estanciaCalculada}</td>
+            </tr>
+            <tr>
+                 <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Informe proporcionado a:</b> ${data.familiarResponsable || 'No registrado'}</td>
             </tr>
             <tr>
                 <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Elaboró:</b> ${data.medico}</td>
@@ -379,12 +457,7 @@ export default function App() {
         <div style="margin-bottom: 25px;">
             <div style="background: #eee; padding: 4px 8px; font-weight: bold; font-size: 14px; border-left: 4px solid #333;">P - PLAN</div>
             <div style="font-size: 13px;">
-                <p style="margin: 3px 0;">1. <b>Dieta:</b> ${data.planDieta}</p>
-                <p style="margin: 3px 0;">2. <b>SV y CGE:</b> ${data.planCuidados}</p>
-                <p style="margin: 3px 0;">3. <b>Soluciones:</b> ${data.planHidratacion}</p>
-                <p style="margin: 3px 0;">4. <b>Medicamentos:</b> ${data.planMedicamentos}</p>
-                ${data.planEstudios ? `<p style="margin: 3px 0;">5. <b>Estudios:</b> ${data.planEstudios}</p>` : ''}
-                ${data.planIndicaciones ? `<p style="margin: 3px 0;">6. <b>Otras:</b> ${data.planIndicaciones}</p>` : ''}
+                <p style="margin: 5px 0; white-space: pre-wrap;">${data.plan}</p>
                 <p style="margin: 10px 0; font-weight: bold;">➡ Reportar eventualidades.</p>
             </div>
         </div>
@@ -443,7 +516,7 @@ export default function App() {
       case 1:
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><User size={20}/> Ficha de Identificación</SectionTitle>
+            <StepHeader icon={User} title="Ficha de Identificación" subtitle="Datos personales y administrativos del paciente." />
             <div><Label>Folio / Expediente</Label><Input value={form.folio} onChange={e => updateForm('folio', e.target.value)} placeholder="000-000" /></div>
             <div><Label>Fecha Nacimiento</Label>
               <div className="grid grid-cols-3 gap-2">
@@ -475,7 +548,7 @@ export default function App() {
       case 2:
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><History size={20}/> Motivo de Consulta</SectionTitle>
+            <StepHeader icon={History} title="Motivo de Consulta" subtitle="Síntoma principal y padecimiento actual." />
             <div><Label>Síntoma Principal</Label><Input value={form.sintomaPrincipal} onChange={e => updateForm('sintomaPrincipal', e.target.value)} placeholder="Ej. Convulsiones..." /></div>
             <div><Label>Tiempo de Evolución</Label><Input value={form.tiempoEvolucion} onChange={e => updateForm('tiempoEvolucion', e.target.value)} placeholder="Ej. 30 minutos..." /></div>
             <div className="relative"><Label>Padecimiento Actual (Breve)</Label><TextArea rows={12} value={form.padecimientoActual} onChange={e => updateForm('padecimientoActual', e.target.value)} />
@@ -486,7 +559,7 @@ export default function App() {
       case 3:
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><HeartPulse size={20}/> Signos Vitales & Glasgow</SectionTitle>
+            <StepHeader icon={HeartPulse} title="Signos Vitales y Glasgow" subtitle="Parámetros fisiológicos, somatometría y estado neurológico." />
             <div className="grid grid-cols-3 gap-3">
               {SIGNOS_ORDER.map(key => (
                 <div key={key} className="aspect-square p-2 bg-slate-100 dark:bg-[#1e293b] border-2 border-slate-200 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center shadow-sm relative group focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
@@ -517,7 +590,7 @@ export default function App() {
       case 4:
         return (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><ClipboardPlus size={20}/> Antecedentes</SectionTitle>
+            <StepHeader icon={History} title="Antecedentes" subtitle="Historial patológico, no patológico y alergias." />
             <div><Label>Patológicos</Label><div className="min-h-[60px] p-3 bg-slate-100 dark:bg-[#1e293b] rounded-xl mb-3 flex flex-wrap gap-2 items-center border-2 border-slate-200 dark:border-slate-700 shadow-inner">{form.antecedentes.length === 0 && <span className="text-slate-400 text-sm italic">Ninguno</span>}{form.antecedentes.map(a => (<span key={a} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-300 dark:border-slate-600">{a} <button onClick={() => removeAntecedente(a)} className="hover:text-red-500"><X size={14}/></button></span>))}</div><div className="grid grid-cols-3 gap-2">{ANTECEDENTES_OPTS.map(o => (<button key={o} onClick={() => addAntecedente(o)} className="px-2 py-2 bg-slate-200 dark:bg-[#1e293b] hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 border-2 border-slate-300 dark:border-slate-700"><Plus size={12}/> {o}</button>))}</div></div>
             <div><Label>Añadir Otro</Label><div className="flex gap-2"><Input value={customAntecedente} onChange={e => setCustomAntecedente(e.target.value)} placeholder="Ej: Hipotiroidismo" onKeyDown={e => e.key === 'Enter' && (addAntecedente(customAntecedente), setCustomAntecedente(''))} className="dark:bg-[#1e293b] dark:border-slate-700"/><button onClick={() => { addAntecedente(customAntecedente); setCustomAntecedente(''); }} className="aspect-square bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg flex items-center justify-center w-14"><Plus size={24}/></button></div></div>
             <div><Label>Alergias</Label><Input value={form.alergias} onChange={e => updateForm('alergias', e.target.value)} className="dark:bg-[#1e293b] dark:border-slate-700"/></div>
@@ -527,7 +600,7 @@ export default function App() {
       case 5:
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><CheckCircle size={20}/> Diagnóstico y Plan</SectionTitle>
+            <StepHeader icon={CheckCircle} title="Diagnóstico y Plan" subtitle="Integración diagnóstica, pronóstico y tratamiento." />
             <div><Label>Diagnósticos</Label><div className="min-h-[50px] p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-3 flex flex-col gap-2 border-2 border-slate-200 dark:border-slate-700">{form.diagnostico.length === 0 ? (<span className="text-slate-400 dark:text-slate-500 text-sm italic py-2 px-1">Vacío</span>) : (<div className="flex flex-wrap gap-2">{form.diagnostico.map(dx => (<div key={dx} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-sm shadow-sm"><span>{dx}</span><button onClick={() => removeDx(dx)} className="text-slate-400 hover:text-red-500 dark:hover:text-red-400"><X size={14}/></button></div>))}</div>)}</div><div className="flex gap-2 mb-4"><div className="relative flex-1"><Input value={customDx} onChange={e => setCustomDx(e.target.value)} placeholder="[CIE-10] Diagnóstico" onKeyDown={e => e.key==='Enter' && addDx(customDx)} className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200"/></div><button onClick={() => addDx(customDx)} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl w-14 flex items-center justify-center shadow-lg"><Plus size={24}/></button></div><div className="grid grid-cols-4 gap-2">{DX_PRESETS.map(preset => (<button key={preset.code} onClick={() => addDx(`${preset.code} - ${preset.label}`)} className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"><Plus size={10}/> {preset.code}</button>))}</div></div>
             <div><Label>Pronóstico</Label><div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border-2 border-slate-200 dark:border-slate-800">{PRONOSTICO_OPTS.map(opt => (<button key={opt} onClick={() => updateForm('pronostico', opt)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${form.pronostico === opt ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400'}`}>{opt}</button>))}</div></div>
             <div><Label>Plan de Tratamiento</Label><TextArea rows={8} value={form.plan} onChange={e => updateForm('plan', e.target.value)} placeholder="1. Dieta... 2. Soluciones..." className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 font-mono text-sm"/></div>
@@ -544,7 +617,7 @@ export default function App() {
       case 1:
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><User size={20}/> Datos Generales</SectionTitle>
+            <StepHeader icon={User} title="Datos Generales" subtitle="Identificación del paciente y tiempos de la nota." />
             <div className="grid grid-cols-2 gap-4">
                 <div><Label>Folio / Expediente</Label><Input value={evoForm.folio} onChange={e => updateEvoForm('folio', e.target.value)} /></div>
                 <div><Label>Cama</Label><Input value={evoForm.cama} onChange={e => updateEvoForm('cama', e.target.value)} /></div>
@@ -553,6 +626,23 @@ export default function App() {
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Edad</Label><Input value={evoForm.edad} onChange={e => updateEvoForm('edad', e.target.value)} /></div>
               <div><Label>Sexo</Label><Select value={evoForm.sexo} onChange={e => updateEvoForm('sexo', e.target.value)}><option value="">-</option><option>Masculino</option><option>Femenino</option></Select></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <Label>Escolaridad</Label>
+                    <Select value={evoForm.escolaridad} onChange={e => updateEvoForm('escolaridad', e.target.value)}>
+                        <option value="">-</option>
+                        <option>Ninguna</option>
+                        <option>Primaria</option>
+                        <option>Secundaria</option>
+                        <option>Bachillerato</option>
+                        <option>Licenciatura</option>
+                    </Select>
+                </div>
+                <div>
+                    <Label>Ocupación</Label>
+                    <Input value={evoForm.ocupacion} onChange={e => updateEvoForm('ocupacion', e.target.value)} />
+                </div>
             </div>
             
             <SectionTitle><History size={20}/> Tiempos</SectionTitle>
@@ -564,11 +654,16 @@ export default function App() {
                <div><Label>Fecha Nota</Label><Input value={evoForm.fecha} onChange={e => updateEvoForm('fecha', e.target.value)} /></div>
                <div><Label>Hora Nota</Label><Input type="time" value={evoForm.hora} onChange={e => updateEvoForm('hora', e.target.value)} /></div>
             </div>
+            
+            <div className="mt-2">
+                <Label>Familiar Responsable (Informe)</Label>
+                <Input value={evoForm.familiarResponsable} onChange={e => updateEvoForm('familiarResponsable', e.target.value)} placeholder="Nombre del familiar a quien se brinda informes" />
+            </div>
 
             <SectionTitle><UserCheck size={20}/> Médico</SectionTitle>
              <div className="flex items-center gap-2 mb-2">
                 <input type="checkbox" id="defDoc" checked={useDefaultDoctor} onChange={e => setUseDefaultDoctor(e.target.checked)} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"/>
-                <label htmlFor="defDoc" className="text-sm text-slate-600 dark:text-slate-300">Usar médico predeterminado</label>
+                <label htmlFor="defDoc" className="text-sm text-slate-600 dark:text-slate-300">Médico Predeterminado (Dr. Gabriel Méndez)</label>
             </div>
             <Input value={evoForm.medico} onChange={e => updateEvoForm('medico', e.target.value)} placeholder="Nombre del médico que elabora" disabled={useDefaultDoctor}/>
           </div>
@@ -576,7 +671,7 @@ export default function App() {
       case 2:
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><FileText size={20}/> Subjetivo (Interrogatorio)</SectionTitle>
+            <StepHeader icon={FileText} title="Subjetivo" subtitle="Evolución reportada por el paciente o familiar." />
             <div className="relative">
                 <Label>Evolución reportada por el paciente/familiar</Label>
                 <TextArea rows={15} value={evoForm.subjetivo} onChange={e => updateEvoForm('subjetivo', e.target.value)} placeholder="El paciente refiere..." />
@@ -597,7 +692,7 @@ export default function App() {
       case 3:
          return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <SectionTitle><HeartPulse size={20}/> Objetivo</SectionTitle>
+            <StepHeader icon={HeartPulse} title="Objetivo" subtitle="Signos vitales, exploración física y resultados." />
             
             <div className="grid grid-cols-3 gap-3">
               {SIGNOS_ORDER.map(key => (
@@ -637,7 +732,7 @@ export default function App() {
       case 4:
           return (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <SectionTitle><Activity size={20}/> Análisis Clínico</SectionTitle>
+                <StepHeader icon={Activity} title="Análisis Clínico" subtitle="Interpretación de la evolución y diagnósticos." />
                 
                 {/* Diagnósticos de Ingreso */}
                 <div className="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -710,37 +805,19 @@ export default function App() {
       case 5:
           return (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-                <SectionTitle><ClipboardPlus size={20}/> Plan de Manejo</SectionTitle>
+                <StepHeader icon={ClipboardPlus} title="Plan de Manejo" subtitle="Indicaciones terapéuticas y seguimiento." />
                 
                 <div>
-                    <Label>1. Dieta</Label>
-                    <Input value={evoForm.planDieta} onChange={e => updateEvoForm('planDieta', e.target.value)} placeholder="Ej. Ayuno, Blanda, Normal..." />
+                   <Label>Plan de Tratamiento</Label>
+                   <TextArea rows={12} value={evoForm.plan} onChange={e => updateEvoForm('plan', e.target.value)} placeholder="1. Dieta... 2. Soluciones... 3. Medicamentos..." className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 font-mono text-sm"/>
                 </div>
 
-                 <div>
-                    <Label>2. SV y Cuidados (CGE)</Label>
-                    <Input value={evoForm.planCuidados} onChange={e => updateEvoForm('planCuidados', e.target.value)} placeholder="Signos vitales por turno y cuidados generales..." />
-                </div>
-
-                <div>
-                    <Label>3. Soluciones Parenterales</Label>
-                    <TextArea rows={3} value={evoForm.planHidratacion} onChange={e => updateEvoForm('planHidratacion', e.target.value)} placeholder="Ej. Sol. Hartmann 1000cc para 8 hrs..." />
-                </div>
-
-                <div>
-                    <Label>4. Medicamentos</Label>
-                    <TextArea rows={6} value={evoForm.planMedicamentos} onChange={e => updateEvoForm('planMedicamentos', e.target.value)} placeholder="- Omeprazol 40mg IV c/24h..." className="font-mono text-sm" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <Label>5. Estudios Solicitados</Label>
-                        <TextArea rows={3} value={evoForm.planEstudios} onChange={e => updateEvoForm('planEstudios', e.target.value)} placeholder="Labs, Rx, TAC..." />
-                    </div>
-                    <div>
-                        <Label>6. Otras Indicaciones</Label>
-                        <TextArea rows={3} value={evoForm.planIndicaciones} onChange={e => updateEvoForm('planIndicaciones', e.target.value)} placeholder="Posición, oxigenoterapia, etc..." />
-                    </div>
+                <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-sm mt-4">
+                  <h4 className="text-emerald-600 dark:text-emerald-400 font-bold mb-2 flex items-center gap-2"><Wand2 size={18}/> Autocompletar</h4>
+                  <TextArea rows={4} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Texto libre..." className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-300 text-sm shadow-sm"/>
+                  <button onClick={handleSmartFill} disabled={isImporting} className="w-full bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 mt-4 transition-all shadow-md">
+                    {isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Rellenar
+                  </button>
                 </div>
             </div>
           );
@@ -748,183 +825,247 @@ export default function App() {
     }
   };
 
-  // --- SELECTION SCREEN ---
-  if (appMode === 'selection') {
-    return (
-      <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden transition-all duration-700 ${dark ? 'bg-[radial-gradient(ellipse_at_bottom,_#1B2735_0%,_#090A0F_100%)]' : 'bg-gradient-to-b from-blue-950 via-blue-700 to-teal-400'}`}>
-         
-         <button 
-            onClick={() => setDark(!dark)} 
-            className="absolute top-4 left-4 z-50 p-2 text-white/60 hover:text-white bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-full transition-all duration-300"
-         >
-            {dark ? <Sun size={24} /> : <Moon size={24} />}
-         </button>
+  const getBackgroundClass = () => {
+    if (appMode === 'selection') {
+      return dark 
+        ? 'bg-[radial-gradient(ellipse_at_bottom,_#1B2735_0%,_#090A0F_100%)]' 
+        : 'bg-gradient-to-b from-blue-950 via-blue-700 to-teal-400';
+    }
+    if (appMode === 'admission') {
+      return dark
+        ? 'bg-[radial-gradient(circle_at_top,_#047857_0%,_#022c22_100%)]' 
+        : 'bg-gradient-to-br from-teal-500 via-emerald-400 to-green-300';
+    }
+    // Evolution
+    return dark
+      ? 'bg-[radial-gradient(circle_at_top,_#4338ca_0%,_#1e1b4b_100%)]'
+      : 'bg-gradient-to-br from-indigo-500 via-blue-500 to-sky-400';
+  };
 
-         <AuroraStyles />
-         
-         {/* Stars - Always Visible now */}
-         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            <div className="star-layer stars-small"></div>
-            <div className="star-layer stars-medium"></div>
-            <div className="star-layer stars-large"></div>
-         </div>
-
-         {/* Header */}
-         <div className="max-w-3xl text-center mb-16 z-10 animate-in fade-in slide-in-from-top-10 duration-700">
-            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-6">
-              <span className={`text-transparent bg-clip-text drop-shadow-sm ${dark ? 'bg-gradient-to-t from-sky-400 to-white' : 'bg-gradient-to-r from-teal-200 via-cyan-100 to-white'}`}>
-                AINOTAS
-              </span>
-            </h1>
-            <p className="text-lg text-slate-200/90 font-medium leading-relaxed max-w-3xl mx-auto drop-shadow-md px-4">
-               Aplicación médica desarrollada por el <span className="font-bold text-white">Dr. Gabriel Méndez</span> para facilitar, optimizar y potenciar el aprendizaje de Médicos Internos de Pregrado en la elaboración de notas médicas claras, completas y apegadas a la Norma Oficial del Expediente Clínico, en el Hospital General de Apatzingán.
-            </p>
-         </div>
-
-         {/* Cards Grid */}
-         <div className="max-w-5xl w-full grid md:grid-cols-2 gap-8 z-10 px-4">
-            {/* Card 1: Ingreso */}
-            <div 
-               onClick={() => { setAppMode('admission'); setStep(1); }}
-               className="group relative bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(52,211,153,0.3)] transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
-            >
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                <div className="relative z-10 flex flex-col h-full">
-                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30 group-hover:scale-110 transition-transform duration-300">
-                        <FileText size={32} className="text-emerald-300" />
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold text-white mb-3 drop-shadow-md">Nota de Ingreso</h2>
-                    <p className="text-slate-200 text-sm leading-relaxed mb-8 flex-grow">
-                      Historia clínica detallada, antecedentes, exploración física y plan de manejo inicial.
-                    </p>
-
-                    <div className="flex items-center justify-end mt-auto">
-                        <button className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-colors">
-                          Comenzar <ArrowRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Card 2: Evolucion */}
-            <div 
-               onClick={() => { setAppMode('evolution'); setStep(1); }}
-               className="group relative bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(99,102,241,0.3)] transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
-            >
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                <div className="relative z-10 flex flex-col h-full">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(99,102,241,0.3)] border border-indigo-400/30 group-hover:scale-110 transition-transform duration-300">
-                        <Activity size={32} className="text-indigo-300" />
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold text-white mb-3 drop-shadow-md">Nota de Evolución</h2>
-                    <p className="text-slate-200 text-sm leading-relaxed mb-8 flex-grow">
-                      Formato SOAP para seguimiento diario. Subjetivo, Objetivo, Análisis y Plan actualizado.
-                    </p>
-
-                    <div className="flex items-center justify-end mt-auto">
-                        <button className="px-6 py-2.5 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-indigo-500/30 transition-colors">
-                          Comenzar <ArrowRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-         </div>
-      </div>
-    );
-  }
-
-  // --- MAIN APP ---
   const currentConfig = appMode === 'admission' ? STEPS_CONFIG : EVOLUTION_STEPS;
   const isLastStep = step === currentConfig.length;
 
   return (
-    <div className="app-bg min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans">
+    <div className={`min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans transition-all duration-500 ${getBackgroundClass()}`}>
       <AuroraStyles />
-      <div className={`sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-md border-b border-white/10 dark:border-black/10 transition-all duration-300 ${appMode === 'admission' ? 'bg-emerald-600 dark:bg-[#00d2ff]' : 'bg-indigo-600 dark:bg-indigo-500'}`}>
-          <div className="flex items-center gap-2">
-              {/* Back to Menu Button */}
-              <button onClick={() => setAppMode('selection')} className="bg-black/20 text-white p-2 rounded-xl hover:bg-black/30 mr-1"><ChevronLeft/></button>
-              
-              <div className="flex flex-col">
-                   <h1 className="font-bold text-base leading-4 text-white dark:text-slate-900">
-                       {appMode === 'admission' ? 'Nota de Ingreso' : 'Nota de Evolución'}
-                   </h1>
-                   <p className="text-[10px] text-white/80 dark:text-slate-900 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+
+      {/* NEW: Standalone Toggle for Selection Mode - Top Left */}
+      {appMode === 'selection' && (
+        <button 
+            onClick={() => setDark(!dark)} 
+            className="fixed top-4 left-4 z-50 p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-all backdrop-blur-sm border border-white/5"
+        >
+            {dark ? <Sun size={20}/> : <Moon size={20}/>}
+        </button>
+      )}
+
+      {/* EXISTING NAVBAR - Only show if NOT in selection mode */}
+      {appMode !== 'selection' && (
+        <div className={`sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-lg border-b border-white/10 backdrop-blur-md transition-all duration-300 ${
+            appMode === 'admission' 
+                ? 'bg-emerald-600/90 dark:bg-emerald-950/80 text-white' 
+                : 'bg-indigo-600/90 dark:bg-indigo-950/80 text-white'
+        }`}>
+            <div className="flex items-center gap-2">
+                <button onClick={() => setAppMode('selection')} className="bg-white/20 text-white p-2 rounded-xl hover:bg-white/30 mr-1"><ChevronLeft/></button>
+                
+                <div className="flex flex-col cursor-pointer" onClick={() => setShowDisclaimer(true)}>
+                    <h1 className="font-bold text-base leading-4 text-white hover:opacity-80 transition-opacity">
+                        {appMode === 'admission' ? 'Nota de Ingreso' : appMode === 'evolution' ? 'Nota de Evolución' : 'AINOTAS'}
+                    </h1>
+                    <p className="text-[10px] text-white/80 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+                </div>
+            </div>
+            <div className="flex gap-0.5">
+                <button onClick={() => setShowQr(true)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors"><QrCode size={22}/></button>
+                <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors">{isProcessing ? <Loader2 className="animate-spin" size={22} /> : <Sparkles size={22}/>}</button>
+                <button onClick={() => setDark(!dark)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors">{dark ? <Sun size={22}/> : <Moon size={22}/>}</button>
+                <button onClick={() => setShowHistory(true)} className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors"><Archive size={22}/></button>
+            </div>
+        </div>
+      )}
+      
+      {/* Steps Bar - Only show if not in selection */}
+      {appMode !== 'selection' && (
+          <div className={`px-4 pt-6 pb-12 shadow-inner relative z-20 transition-colors duration-300 ${
+              appMode === 'admission' 
+                ? 'bg-emerald-700/50 dark:bg-emerald-900/50 backdrop-blur-sm' 
+                : 'bg-indigo-700/50 dark:bg-indigo-900/50 backdrop-blur-sm'
+          }`}>
+              <div className="flex justify-between max-w-lg mx-auto">
+                  {currentConfig.map(s => (
+                      <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-slate-800 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}>
+                              <s.icon size={22} className={step===s.id ? (appMode === 'admission' ? 'text-emerald-600' : 'text-indigo-600') : ''}/>
+                          </div>
+                          <span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-white/60'}`}>{s.label}</span>
+                      </div>
+                  ))}
               </div>
           </div>
-          <div className="flex gap-0.5">
-              <button onClick={() => setShowQr(true)} className="p-1.5 text-white dark:text-slate-900 hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors"><QrCode size={22}/></button>
-              <button onClick={() => handleSystemAnalysis()} disabled={isProcessing} className="p-1.5 text-white dark:text-slate-900 hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors">{isProcessing ? <Loader2 className="animate-spin" size={22} /> : <Sparkles size={22}/>}</button>
-              <button onClick={() => setDark(!dark)} className="p-1.5 text-white dark:text-slate-900 hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors">{dark ? <Sun size={22}/> : <Moon size={22}/>}</button>
-              <button onClick={() => setShowHistory(true)} className="p-1.5 text-white dark:text-slate-900 hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors"><Archive size={22}/></button>
-          </div>
-      </div>
-      
-      {/* Steps Bar */}
-      <div className={`px-4 pt-6 pb-12 shadow-sm relative z-20 ${appMode === 'admission' ? 'bg-blue-500 dark:bg-[#064e3b]' : 'bg-indigo-500 dark:bg-indigo-900'}`}>
-          <div className="flex justify-between max-w-lg mx-auto">
-              {currentConfig.map(s => (
-                  <div key={s.id} onClick={() => setStep(s.id)} className="flex flex-col items-center gap-1 cursor-pointer">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all ${step===s.id ? 'bg-white text-emerald-600 border-white scale-110 shadow-lg' : 'border-white/40 text-white'}`}>
-                          <s.icon size={22} className={step===s.id && appMode === 'evolution' ? 'text-indigo-600' : ''}/>
-                      </div>
-                      <span className={`text-[10px] font-bold ${step===s.id ? 'text-white' : 'text-white/60'}`}>{s.label}</span>
-                  </div>
-              ))}
-          </div>
-      </div>
+      )}
 
-      <main className="px-4 -mt-6 relative z-30">
-        <div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 shadow-2xl max-w-3xl mx-auto min-h-[60vh] flex flex-col justify-between">
-          {appMode === 'admission' ? renderAdmissionStep() : renderEvolutionStep()}
-          
-          <div className="flex justify-between mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 items-center">
-             <button onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} className="flex items-center gap-2 text-slate-400 disabled:opacity-30 hover:text-emerald-600 font-medium transition-colors"><ChevronLeft size={20}/> Atrás</button>
-             {!isLastStep ? (
-                 <button onClick={() => setStep(step + 1)} className={`${appMode==='admission'?'bg-emerald-600 hover:bg-emerald-700':'bg-indigo-600 hover:bg-indigo-700'} text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transform hover:scale-105 transition-all`}>
-                     Siguiente <ChevronRight size={18}/>
-                 </button>
-             ) : (
-               <div className="flex gap-4">
-                 <button 
-                   onClick={downloadWord} 
-                   className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 ${appMode==='admission'?'text-emerald-600 border-emerald-100':'text-indigo-600 border-indigo-100'} hover:border-current shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
-                   title="Descargar documento Word"
-                 >
-                   <Download size={24} strokeWidth={2.5} />
-                 </button>
-                 <button 
-                   onClick={handleWhatsApp} 
-                   className={`w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-r ${appMode==='admission'?'from-emerald-500 to-emerald-600':'from-indigo-500 to-indigo-600'} text-white shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
-                   title="Compartir por WhatsApp"
-                 >
-                   <Share2 size={24} strokeWidth={2.5} />
-                 </button>
-               </div>
-             )}
-          </div>
-        </div>
-      </main>
+      {appMode !== 'selection' && (
+        <main className="px-4 -mt-6 relative z-30">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/20 dark:border-slate-700 rounded-t-3xl p-6 shadow-2xl max-w-3xl mx-auto min-h-[60vh] flex flex-col justify-between">
+            {appMode === 'admission' ? renderAdmissionStep() : renderEvolutionStep()}
+            
+            <div className="flex justify-between mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 items-center">
+                <button onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} className="flex items-center gap-2 text-slate-400 disabled:opacity-30 hover:text-emerald-600 font-medium transition-colors"><ChevronLeft size={20}/> Atrás</button>
+                {!isLastStep ? (
+                    <button onClick={() => setStep(step + 1)} className={`${appMode==='admission'?'bg-emerald-600 hover:bg-emerald-700':'bg-indigo-600 hover:bg-indigo-700'} text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-lg`}>
+                        Siguiente <ChevronRight size={18}/>
+                    </button>
+                ) : (
+                <div className="flex gap-4">
+                    <button 
+                    onClick={downloadWord} 
+                    className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 ${appMode==='admission'?'text-emerald-600 border-emerald-100':'text-indigo-600 border-indigo-100'} hover:border-current shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                    title="Descargar documento Word"
+                    >
+                    <Download size={24} strokeWidth={2.5} />
+                    </button>
+                    <button 
+                    onClick={handleWhatsApp} 
+                    className={`w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-r ${appMode==='admission'?'from-emerald-500 to-emerald-600':'from-indigo-500 to-indigo-600'} text-white shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                    title="Compartir por WhatsApp"
+                    >
+                    <Share2 size={24} strokeWidth={2.5} />
+                    </button>
+                </div>
+                )}
+            </div>
+            </div>
+        </main>
+      )}
+
+      {/* --- SELECTION SCREEN CONTENT --- */}
+      {appMode === 'selection' && (
+         <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-60px)]">
+             {/* Header */}
+            <div className="max-w-3xl text-center mb-16 animate-in fade-in slide-in-from-top-10 duration-700">
+                <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-6 cursor-pointer hover:scale-105 transition-transform" onClick={() => setShowDisclaimer(true)}>
+                <span className={`text-transparent bg-clip-text drop-shadow-sm ${dark ? 'bg-gradient-to-t from-sky-400 to-white' : 'bg-gradient-to-r from-teal-200 via-cyan-100 to-white'}`}>
+                    AINOTAS
+                </span>
+                </h1>
+                <p className="text-lg text-slate-200/90 font-medium leading-relaxed max-w-3xl mx-auto drop-shadow-md px-4">
+                Aplicación médica desarrollada por el <span className="font-bold text-white">Dr. Gabriel Méndez</span> para facilitar, optimizar y potenciar el aprendizaje de Médicos Internos de Pregrado en la elaboración de notas médicas claras, completas y apegadas a la Norma Oficial del Expediente Clínico, en el Hospital General de Apatzingán.
+                </p>
+            </div>
+
+            {/* Cards Grid */}
+            <div className="max-w-5xl w-full grid md:grid-cols-2 gap-8 px-4">
+                {/* Card 1: Ingreso */}
+                <div 
+                onClick={() => { setAppMode('admission'); setStep(1); }}
+                className="group relative bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(52,211,153,0.3)] transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="relative z-10 flex flex-col h-full">
+                        <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30 group-hover:scale-110 transition-transform duration-300">
+                            <FileText size={32} className="text-emerald-300" />
+                        </div>
+                        
+                        <h2 className="text-3xl font-bold text-white mb-3 drop-shadow-md">Nota de Ingreso</h2>
+                        <p className="text-slate-200 text-sm leading-relaxed mb-8 flex-grow">
+                        Historia clínica detallada, antecedentes, exploración física y plan de manejo inicial.
+                        </p>
+
+                        <div className="flex items-center justify-end mt-auto">
+                            <button className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-colors">
+                            Comenzar <ArrowRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 2: Evolucion */}
+                <div 
+                onClick={() => { 
+                    setAppMode('evolution'); 
+                    setStep(1); 
+                    // Auto-update time when starting evolution note
+                    const now = new Date();
+                    setEvoForm(prev => ({
+                        ...prev,
+                        fecha: now.toLocaleDateString('es-MX'),
+                        hora: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0')
+                    }));
+                }}
+                className="group relative bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(99,102,241,0.3)] transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="relative z-10 flex flex-col h-full">
+                        <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(99,102,241,0.3)] border border-indigo-400/30 group-hover:scale-110 transition-transform duration-300">
+                            <Activity size={32} className="text-indigo-300" />
+                        </div>
+                        
+                        <h2 className="text-3xl font-bold text-white mb-3 drop-shadow-md">Nota de Evolución</h2>
+                        <p className="text-slate-200 text-sm leading-relaxed mb-8 flex-grow">
+                        Formato SOAP para seguimiento diario. Subjetivo, Objetivo, Análisis y Plan actualizado.
+                        </p>
+
+                        <div className="flex items-center justify-end mt-auto">
+                            <button className="px-6 py-2.5 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-indigo-500/30 transition-colors">
+                            Comenzar <ArrowRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+         </div>
+      )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce flex items-center gap-2 text-sm"><CheckCircle size={16} className="text-emerald-400"/> {toast}</div>}
       
       {/* AI Modal Logic reused for both but could be customized */}
-      {processingResult && appMode === 'admission' && (
+      {processingResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
            <div className="bg-[#0f172a] w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 animate-in zoom-in-95">
               <div className="bg-[#1e293b] p-4 flex justify-between items-center border-b border-slate-700">
-                <h3 className="font-bold text-lg text-indigo-400 flex items-center gap-2"><Sparkles className="text-indigo-500" size={20} /> Análisis Clínico</h3>
+                <h3 className="font-bold text-lg text-indigo-400 flex items-center gap-2"><Sparkles className="text-indigo-500" size={20} /> Análisis Clínico Automatizado</h3>
                 <button onClick={() => setProcessingResult(null)} className="text-slate-400 hover:text-white transition-colors"><X size={20}/></button>
               </div>
               <div className="overflow-y-auto p-6 space-y-6 text-slate-300 custom-scrollbar">
+                
+                {/* Observaciones (General) */}
                 {processingResult.observaciones?.length > 0 && (<div className="border border-amber-900/50 bg-amber-950/20 rounded-xl overflow-hidden"><div className="bg-amber-900/30 px-4 py-2 border-b border-amber-900/50 flex items-center gap-2"><AlertOctagon size={16} className="text-amber-500"/><span className="font-bold text-amber-500 text-sm uppercase tracking-wide">Observaciones</span></div><ul className="p-4 space-y-2">{processingResult.observaciones.map((obs, i) => (<li key={i} className="flex gap-2 text-sm text-amber-100/80"><span className="text-amber-500 mt-1.5">•</span><span>{obs}</span></li>))}</ul></div>)}
-                <div className="border border-blue-900/50 bg-blue-950/20 rounded-xl overflow-hidden"><div className="bg-blue-900/30 px-4 py-2 border-b border-blue-900/50 flex items-center gap-2"><BookOpen size={16} className="text-blue-400"/><span className="font-bold text-blue-400 text-sm uppercase tracking-wide">Redacción Sugerida</span></div><div className="p-4 text-sm text-blue-100/90 leading-relaxed italic">"{processingResult.padecimientoMedico}"</div></div>
-                <div><h4 className="text-indigo-400 text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2"><Activity size={16}/> Diagnósticos</h4><div className="space-y-3">{processingResult.diagnosticosSugeridos.map((dx, i) => (<div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-3"><div className="flex items-center gap-2 mb-1"><span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs font-bold font-mono">{dx.codigo}</span><span className="font-bold text-slate-200 text-sm">{dx.nombre}</span></div><p className="text-xs text-slate-400 pl-1">{dx.justificacion}</p></div>))}</div></div>
-                <div className="border border-slate-700 bg-slate-800/30 rounded-xl overflow-hidden"><div className="bg-slate-800/80 px-4 py-2 border-b border-slate-700 flex items-center gap-2"><ClipboardPlus size={16} className="text-emerald-400"/><span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">Plan</span></div><div className="p-4 text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{processingResult.planEstructurado}</div></div>
+                
+                {/* Redacción Sugerida (Azul) */}
+                <div className="border border-blue-900/50 bg-blue-950/20 rounded-xl overflow-hidden">
+                    <div className="bg-blue-900/30 px-4 py-2 border-b border-blue-900/50 flex items-center gap-2">
+                        <BookOpen size={16} className="text-blue-400"/>
+                        <span className="font-bold text-blue-400 text-sm uppercase tracking-wide">
+                            {appMode === 'admission' ? 'Padecimiento Sugerido' : 'Subjetivo Sugerido'}
+                        </span>
+                    </div>
+                    <div className="p-4 text-sm text-blue-100/90 leading-relaxed italic">
+                        "{appMode === 'admission' ? (processingResult as AiAnalysisResult).padecimientoMedico : (processingResult as AiEvolutionResult).subjetivoMejorado}"
+                    </div>
+                </div>
+
+                {/* Diagnósticos */}
+                <div><h4 className="text-indigo-400 text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2"><Activity size={16}/> Posibles Diagnósticos</h4><div className="space-y-3">{processingResult.diagnosticosSugeridos.map((dx, i) => (<div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-3"><div className="flex items-center gap-2 mb-1"><span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs font-bold font-mono">{dx.codigo}</span><span className="font-bold text-slate-200 text-sm">{dx.nombre}</span></div><p className="text-xs text-slate-400 pl-1">{dx.justificacion}</p></div>))}</div></div>
+
+                {/* Análisis Clínico (Solo Evolución) */}
+                {appMode === 'evolution' && (
+                    <div className="border border-indigo-900/50 bg-indigo-950/20 rounded-xl overflow-hidden">
+                        <div className="bg-indigo-900/30 px-4 py-2 border-b border-indigo-900/50 flex items-center gap-2">
+                            <Activity size={16} className="text-indigo-400"/>
+                            <span className="font-bold text-indigo-400 text-sm uppercase tracking-wide">Integración / Análisis</span>
+                        </div>
+                        <div className="p-4 text-sm text-indigo-100/90 leading-relaxed">
+                            {(processingResult as AiEvolutionResult).analisisClinico}
+                        </div>
+                    </div>
+                )}
+                
+                {/* Plan Sugerido (Verde) */}
+                <div className="border border-slate-700 bg-slate-800/30 rounded-xl overflow-hidden"><div className="bg-slate-800/80 px-4 py-2 border-b border-slate-700 flex items-center gap-2"><ClipboardPlus size={16} className="text-emerald-400"/><span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">{appMode === 'admission' ? 'Plan Sugerido' : 'Plan de Manejo'}</span></div><div className="p-4 text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{appMode === 'admission' ? (processingResult as AiAnalysisResult).planEstructurado : (processingResult as AiEvolutionResult).planSugerido}</div></div>
+              
               </div>
               <div className="p-4 bg-[#1e293b] border-t border-slate-700 flex justify-end gap-3"><button onClick={() => setProcessingResult(null)} className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">Cerrar</button><button onClick={applySystemSuggestions} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/20 transition-all hover:scale-105"><Check size={16}/> Aplicar</button></div>
            </div>
@@ -950,9 +1091,29 @@ export default function App() {
 
       {showDisclaimer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 max-w-md w-full border border-slate-200 dark:border-slate-700">
-                <div className="flex justify-between w-full mb-4"><h3 className="font-bold text-lg dark:text-white flex items-center gap-2"><AlertTriangle size={20} className="text-amber-500"/> Aviso Legal</h3><button onClick={() => setShowDisclaimer(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button></div>
-                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed text-justify"><p>Esta aplicación es una herramienta de <strong>enseñanza y apoyo</strong>. No reemplaza el criterio médico.</p><button onClick={() => setShowDisclaimer(false)} className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-colors">Entendido</button></div>
+             <div className="bg-[#0f172a] text-slate-200 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 max-w-md w-full border border-slate-700">
+                <div className="flex justify-between w-full mb-6">
+                    <h3 className="font-bold text-xl text-white flex items-center gap-3">
+                        <AlertTriangle size={24} className="text-amber-500" strokeWidth={2.5}/> Aviso Legal
+                    </h3>
+                    <button onClick={() => setShowDisclaimer(false)} className="text-slate-400 hover:text-white transition-colors">
+                        <X size={24}/>
+                    </button>
+                </div>
+                <div className="space-y-4 text-[15px] leading-relaxed text-slate-300">
+                    <p>Esta aplicación fue creada como herramienta de <strong>enseñanza y entrenamiento clínico</strong>, diseñada para reforzar la correcta elaboración de notas de ingreso hospitalario.</p>
+                    <p>Se apega a estándares internacionales y normativos del expediente clínico, pero <strong>no reemplaza la evaluación médica integral ni el criterio profesional</strong>.</p>
+                    
+                    <div className="bg-emerald-950/30 border border-emerald-500/30 p-4 rounded-xl mt-4">
+                        <p className="text-emerald-100/90 text-sm">
+                            <strong>El usuario es responsable del uso adecuado de la información generada.</strong><br/>
+                            Utilízala para aprender, mejorar y brindar una atención médica de calidad.
+                        </p>
+                    </div>
+                </div>
+                <button onClick={() => setShowDisclaimer(false)} className="w-full mt-8 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95 text-base">
+                    Entendido
+                </button>
              </div>
           </div>
       )}

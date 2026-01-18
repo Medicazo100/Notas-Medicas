@@ -104,17 +104,51 @@ export const AiService = {
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
-        sugerenciasRedaccion: { type: Type.STRING },
-        analisisClinico: { type: Type.STRING },
-        alertas: { type: Type.ARRAY, items: { type: Type.STRING } }
-      }
+        observaciones: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Lista crítica de datos faltantes, incongruencias entre signos vitales y narrativa, o riesgos no detectados."
+        },
+        subjetivoMejorado: { 
+          type: Type.STRING,
+          description: "Reescritura profesional del apartado Subjetivo. Debe integrar cronología, sintomatología y evolución respecto al ingreso."
+        },
+        diagnosticosSugeridos: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              codigo: { type: Type.STRING },
+              nombre: { type: Type.STRING },
+              justificacion: { type: Type.STRING }
+            }
+          }
+        },
+        analisisClinico: { 
+          type: Type.STRING, 
+          description: "Integración clínica (Apartado 'A'). Debe justificar la mejoría o empeoramiento basándose en el subjetivo y objetivo (signos/labs). Mencionar pronóstico."
+        },
+        planSugerido: { 
+          type: Type.STRING,
+          description: "Plan de manejo detallado y escalonado (Dieta, Soluciones, Medicamentos, Pendientes)."
+        }
+      },
+      required: ["observaciones", "subjetivoMejorado", "diagnosticosSugeridos", "analisisClinico", "planSugerido"]
     };
 
-    const prompt = `Analiza esta nota de evolución SOAP.
-    Datos: ${JSON.stringify(evoData)}.
-    Genera un análisis clínico profundo para el apartado 'Análisis' justificando la evolución del paciente.
-    Mejora la redacción del apartado 'Subjetivo'.
-    Detecta si hay inconsistencias graves.`;
+    const prompt = `Actúa como un Médico Internista Experto auditando y mejorando una Nota de Evolución (SOAP).
+    
+    DATOS DEL PACIENTE (Evolución):
+    ${JSON.stringify(evoData)}
+
+    TU TAREA:
+    1. **Observaciones (Auditoría)**: Detecta qué falta. ¿La frecuencia cardiaca coincide con la fiebre? ¿Falta cuantificar uresis? ¿El plan coincide con el diagnóstico?
+    2. **Subjetivo (Mejorado)**: Redacta el padecimiento actual/evolución con lenguaje técnico.
+    3. **Diagnósticos**: Actualiza los diagnósticos activos CIE-10 basándote en la evolución.
+    4. **Análisis**: Redacta una integración clínica congruente. "Paciente femenino de X años cursando con X día de estancia intrahospitalaria por X patología..."
+    5. **Plan**: Estructura el plan de manejo (Dieta, Soluciones, Medicamentos, Labs).
+
+    Genera una respuesta estructurada JSON.`;
 
     try {
       const response = await ai.models.generateContent({
@@ -223,6 +257,77 @@ export const AiService = {
       return text ? JSON.parse(text) : null;
     } catch (error) {
       console.error("Parsing Error:", error);
+      return null;
+    }
+  },
+
+  parseEvolutionData: async (textInput: string): Promise<Partial<EvolutionForm> | null> => {
+    if (!process.env.API_KEY || !textInput.trim()) return null;
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        nombre: { type: Type.STRING },
+        folio: { type: Type.STRING },
+        cama: { type: Type.STRING },
+        edad: { type: Type.STRING },
+        sexo: { type: Type.STRING },
+        
+        subjetivo: { type: Type.STRING },
+        
+        signos: {
+          type: Type.OBJECT,
+          properties: {
+            ta: { type: Type.STRING },
+            fc: { type: Type.STRING },
+            fr: { type: Type.STRING },
+            temp: { type: Type.STRING },
+            sat: { type: Type.STRING },
+            gluc: { type: Type.STRING },
+            peso: { type: Type.STRING },
+            talla: { type: Type.STRING },
+            imc: { type: Type.STRING },
+          }
+        },
+        g: {
+          type: Type.OBJECT,
+          properties: {
+            o: { type: Type.INTEGER },
+            v: { type: Type.INTEGER },
+            m: { type: Type.INTEGER },
+          }
+        },
+        pupilas: { type: Type.STRING },
+        
+        exploracionFisica: { type: Type.STRING },
+        resultadosLaboratorio: { type: Type.STRING },
+        
+        diagnosticosActivos: { type: Type.ARRAY, items: { type: Type.STRING } },
+        analisis: { type: Type.STRING },
+        pronostico: { type: Type.STRING },
+        pendientes: { type: Type.STRING },
+        plan: { type: Type.STRING }
+      }
+    };
+
+    const prompt = `Analiza el siguiente texto y extrae información para una Nota de Evolución SOAP.
+    Texto: "${textInput}"`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        }
+      });
+      const text = response.text;
+      return text ? JSON.parse(text) : null;
+    } catch (error) {
+      console.error("Evolution Parsing Error:", error);
       return null;
     }
   }

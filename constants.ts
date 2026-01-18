@@ -13,8 +13,9 @@ export const INITIAL_FORM: PatientForm = {
 };
 
 export const INITIAL_EVOLUTION_FORM: EvolutionForm = {
-  folio: '', nombre: '', edad: '', sexo: '', cama: '', fechaIngreso: '', fecha: '', hora: '', 
+  folio: '', nombre: '', edad: '', sexo: '', cama: '', escolaridad: '', ocupacion: '', fechaIngreso: '', fecha: '', hora: '', 
   medico: 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204',
+  familiarResponsable: '',
   subjetivo: '',
   signos: { ta: '', fc: '', fr: '', temp: '', sat: '', gluc: '', peso: '', talla: '', imc: '' },
   g: { o: 4, v: 5, m: 6 },
@@ -26,12 +27,7 @@ export const INITIAL_EVOLUTION_FORM: EvolutionForm = {
   analisis: '',
   pronostico: '',
   pendientes: '', // Nuevo campo
-  planDieta: '',
-  planHidratacion: '',
-  planMedicamentos: '',
-  planCuidados: 'Signos vitales por turno y cuidados generales de enfermería.',
-  planEstudios: '',
-  planIndicaciones: ''
+  plan: '',
 };
 
 export const SIGNOS_LABELS: Record<string, string> = { ta: 'TA', fc: 'FC', fr: 'FR', temp: 'Temp', sat: 'SatO₂', gluc: 'Gluc', peso: 'Peso', talla: 'Talla', imc: 'IMC' };

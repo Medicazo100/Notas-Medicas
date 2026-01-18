@@ -62,10 +62,13 @@ export interface EvolutionForm {
   edad: string;
   sexo: string;
   cama: string;
-  fechaIngreso: string; // Nuevo campo
+  escolaridad: string; // Nuevo campo
+  ocupacion: string;   // Nuevo campo
+  fechaIngreso: string; 
   fecha: string;
   hora: string;
   medico: string;
+  familiarResponsable: string;
   
   // S - Subjetivo
   subjetivo: string;
@@ -73,24 +76,19 @@ export interface EvolutionForm {
   // O - Objetivo
   signos: Signos;
   g: Glasgow;
-  pupilas: string; // Nuevo campo pupilas
+  pupilas: string; 
   resultadosLaboratorio: string;
   exploracionFisica: string;
   
   // A - Análisis
-  diagnosticosIngreso: string[]; // Diagnósticos con los que llegó
-  diagnosticosActivos: string[]; // Nuevos o actuales
+  diagnosticosIngreso: string[]; 
+  diagnosticosActivos: string[]; 
   analisis: string;
   pronostico: string;
-  pendientes: string; // Nuevo campo pendientes
+  pendientes: string; 
   
   // P - Plan
-  planDieta: string;
-  planHidratacion: string;
-  planMedicamentos: string;
-  planCuidados: string;
-  planEstudios: string;
-  planIndicaciones: string;
+  plan: string;
 }
 
 export interface NoteEntry {
@@ -114,7 +112,9 @@ export interface AiAnalysisResult {
 }
 
 export interface AiEvolutionResult {
-  sugerenciasRedaccion: string;
+  observaciones: string[];
+  subjetivoMejorado: string;
+  diagnosticosSugeridos: DiagnosticoSug[];
   analisisClinico: string;
-  alertas: string[];
+  planSugerido: string;
 }
