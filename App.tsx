@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
   Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
-  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets
+  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
@@ -13,11 +13,24 @@ import { StorageService } from './services/storageService';
 import { INITIAL_FORM, INITIAL_EVOLUTION_FORM, SIGNOS_ORDER, SIGNOS_LABELS, SIGNOS_UNITS, MONTHS, SEMIOLOGIA_TAGS, EXPLORACION_PLANTILLAS, ANTECEDENTES_OPTS, SUGERENCIAS_DX, DX_PRESETS, PRONOSTICO_OPTS, PENDIENTES_OPTS, STEPS_CONFIG, EVOLUTION_STEPS } from './constants';
 import { PatientForm, EvolutionForm, AiAnalysisResult, NoteEntry, AiEvolutionResult } from './types';
 
+const StepHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType, title: string, subtitle: string }) => (
+  <div className="flex items-center gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
+    <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+      <Icon size={28} />
+    </div>
+    <div>
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white">{title}</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+    </div>
+  </div>
+);
+
 export default function App() {
   const [appMode, setAppMode] = useState<'selection' | 'admission' | 'evolution'>('selection');
   
   // State for Admission Note
   const [form, setForm] = useState<PatientForm>(INITIAL_FORM);
+  const [useDefaultDoctorAdmission, setUseDefaultDoctorAdmission] = useState(true);
   
   // State for Evolution Note
   const [evoForm, setEvoForm] = useState<EvolutionForm>(INITIAL_EVOLUTION_FORM);
@@ -43,20 +56,61 @@ export default function App() {
   
   // Estado local para el diagnóstico de ingreso en evolución
   const [customIngresoDx, setCustomIngresoDx] = useState('');
-  
+
+  // Refs para autosave (acceder al estado actual dentro del intervalo)
+  const formRef = useRef(form);
+  const evoFormRef = useRef(evoForm);
+  const appModeRef = useRef(appMode);
+
+  // Mantener refs sincronizados
   useEffect(() => {
-    StorageService.clearDraft();
+    formRef.current = form;
+    evoFormRef.current = evoForm;
+    appModeRef.current = appMode;
+  }, [form, evoForm, appMode]);
+
+  // Efecto de Inicialización y Autosave
+  useEffect(() => {
     setNotes(StorageService.getNotes());
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) setDark(true);
     
-    // Set default date/time for evolution note on mount
+    // Configurar fecha/hora inicial para evolución
     const now = new Date();
     setEvoForm(prev => ({
       ...prev,
       fecha: now.toLocaleDateString('es-MX'), 
       hora: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
     }));
-  }, []);
+
+    // Restaurar borradores si existen
+    const savedDraft = StorageService.loadDraft();
+    let msg = '';
+    if (savedDraft) {
+        setForm(savedDraft);
+        msg = 'Borrador de ingreso restaurado';
+    }
+    const savedEvoDraft = StorageService.loadEvolutionDraft();
+    if (savedEvoDraft) {
+        setEvoForm(prev => ({...prev, ...savedEvoDraft})); // Merge para conservar fecha actual si se desea, o sobrescribir todo
+        msg = savedDraft ? 'Borradores restaurados' : 'Borrador de evolución restaurado';
+    }
+    
+    if (msg) {
+        setToast(msg);
+        setTimeout(() => setToast(null), 3000);
+    }
+
+    // Configurar intervalo de guardado automático (30 segundos)
+    const interval = setInterval(() => {
+        if (appModeRef.current === 'admission') {
+            StorageService.saveDraft(formRef.current);
+        } else if (appModeRef.current === 'evolution') {
+            StorageService.saveEvolutionDraft(evoFormRef.current);
+        }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []); // Se ejecuta solo al montar
 
   useEffect(() => {
     if (dob.d && dob.m && dob.y) {
@@ -75,28 +129,36 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-    if (appMode === 'admission') {
-        const timer = setTimeout(() => StorageService.saveDraft(form), 2000);
-        return () => clearTimeout(timer);
-    }
-  }, [form, appMode]);
-
-  useEffect(() => {
     const { o, v, m } = appMode === 'admission' ? form.g : evoForm.g;
     setGlasgowTotal((parseInt(String(o))||0) + (parseInt(String(v))||0) + (parseInt(String(m))||0));
   }, [form.g, evoForm.g, appMode]);
 
-  // Manejo de médico predeterminado
+  // Manejo de médico predeterminado (Evolución)
   useEffect(() => {
     if (appMode === 'evolution') {
         const defaultDoc = 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204';
         if (useDefaultDoctor) {
             updateEvoForm('medico', defaultDoc);
         } else if (evoForm.medico === defaultDoc) {
-            updateEvoForm('medico', ''); // Limpiar si cambia a manual y estaba el default
+            updateEvoForm('medico', ''); 
         }
     }
   }, [useDefaultDoctor, appMode]);
+
+  // Manejo de médico predeterminado (Ingreso)
+  useEffect(() => {
+    if (appMode === 'admission') {
+        const defName = 'Dr. Gabriel Méndez Ortiz';
+        const defCedula = '7630204';
+        if (useDefaultDoctorAdmission) {
+            updateForm('medicoTratante', defName);
+            updateForm('cedulaProfesional', defCedula);
+        } else if (form.medicoTratante === defName) {
+            updateForm('medicoTratante', '');
+            updateForm('cedulaProfesional', '');
+        }
+    }
+  }, [useDefaultDoctorAdmission, appMode]);
 
   const updateForm = (field: keyof PatientForm, val: any) => setForm(prev => ({ ...prev, [field]: val }));
   
@@ -146,7 +208,7 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSystemAnalysis = async () => {
+  const handleSystemAnalysis = async (data = form) => {
     setIsProcessing(true);
     if (appMode === 'admission') {
         if (form.padecimientoActual.length < 5 && step > 1) {
@@ -307,30 +369,6 @@ export default function App() {
     const updatedNotes = StorageService.saveNote(note);
     setNotes(updatedNotes);
     return updatedNotes;
-  };
-
-  // --- Header Component ---
-  const StepHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle: string }) => {
-     const isAdmission = appMode === 'admission';
-     return (
-        <div className={`mb-6 border-l-4 pl-5 py-3 rounded-r-2xl transition-colors shadow-sm ${
-            isAdmission 
-            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20' 
-            : 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'
-        }`}>
-            <h2 className={`text-2xl font-bold flex items-center gap-3 ${
-                isAdmission 
-                ? 'text-emerald-800 dark:text-emerald-300' 
-                : 'text-indigo-800 dark:text-indigo-300'
-            }`}>
-                <Icon size={28} className={isAdmission ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'} />
-                {title}
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 font-medium ml-1">
-                {subtitle}
-            </p>
-        </div>
-     );
   };
 
   // --- Generador HTML Nota Ingreso ---
@@ -499,12 +537,85 @@ export default function App() {
     showToast('Nota descargada correctamente');
   };
 
+  // --- NUEVO: Generador de Texto Estructurado para Admisión ---
+  const generateStructuredAdmissionText = (data: PatientForm) => {
+    const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
+    return `**NOTA DE INGRESO**
+Folio: ${data.folio}
+Paciente: ${data.nombre} (${data.edad}, ${data.sexo})
+Fecha Nac: ${data.fn}
+Medico Tratante: ${data.medicoTratante} (${data.cedulaProfesional})
+
+[MOTIVO]
+Sintoma Principal: ${data.sintomaPrincipal}
+T. Evolución: ${data.tiempoEvolucion}
+Padecimiento: ${data.padecimientoActual}
+
+[SIGNOS VITALES]
+TA:${data.signos.ta} FC:${data.signos.fc} FR:${data.signos.fr} Temp:${data.signos.temp} Sat:${data.signos.sat}
+Peso:${data.signos.peso} Talla:${data.signos.talla} Glucosa:${data.signos.gluc}
+Glasgow: ${glasgow} (${data.g.o}O, ${data.g.v}V, ${data.g.m}M) Pupilas: ${data.pupilas}
+
+[ANTECEDENTES]
+Patológicos: ${data.antecedentes.join(', ')}
+Alergias: ${data.alergias}
+Tabaquismo: ${data.tabaquismo} Alcohol: ${data.alcohol}
+
+[EXPLORACION]
+${data.exploracion}
+
+[DIAGNOSTICO]
+${data.diagnostico.join('\n')}
+Pronóstico: ${data.pronostico}
+
+[PLAN]
+${data.plan}`;
+  };
+
+  // --- NUEVO: Generador de Texto Estructurado para Evolución ---
+  const generateStructuredEvolutionText = (data: EvolutionForm) => {
+    const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
+    return `**NOTA DE EVOLUCIÓN**
+Fecha: ${data.fecha} Hora: ${data.hora}
+Paciente: ${data.nombre}
+Edad: ${data.edad} Sexo: ${data.sexo}
+Folio: ${data.folio} Cama: ${data.cama}
+Ingreso: ${data.fechaIngreso}
+Medico: ${data.medico}
+
+[SUBJETIVO]
+${data.subjetivo}
+
+[OBJETIVO]
+TA:${data.signos.ta} FC:${data.signos.fc} FR:${data.signos.fr} Temp:${data.signos.temp} Sat:${data.signos.sat} Gluc:${data.signos.gluc}
+Glasgow: ${glasgow} (${data.g.o}O, ${data.g.v}V, ${data.g.m}M) Pupilas: ${data.pupilas}
+Exploración Física: ${data.exploracionFisica}
+Laboratorios: ${data.resultadosLaboratorio}
+
+[ANALISIS]
+Diagnósticos Ingreso: ${data.diagnosticosIngreso.join(', ')}
+Diagnósticos Activos: ${data.diagnosticosActivos.join(', ')}
+Análisis Clínico: ${data.analisis}
+Pronóstico: ${data.pronostico}
+Pendientes: ${data.pendientes}
+
+[PLAN]
+${data.plan}`;
+  };
+
   const handleWhatsApp = () => {
+    let text = '';
     const name = appMode === 'admission' ? form.nombre : evoForm.nombre;
+    
     if (!name) return showToast('Falta el nombre del paciente');
+    
+    if (appMode === 'admission') {
+        text = generateStructuredAdmissionText(form);
+    } else {
+        text = generateStructuredEvolutionText(evoForm);
+    }
+
     saveToHistory(); 
-    // Por simplicidad, mandamos un mensaje generico, o podrías implementar generateEvolutionWhatsAppText
-    const text = `Nota médica de ${name} generada.`; 
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
     showToast('Abriendo WhatsApp...');
@@ -539,8 +650,12 @@ export default function App() {
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
               <SectionTitle><Stethoscope size={20}/> Datos del Médico</SectionTitle>
               <div className="space-y-4">
-                <div><Label>Médico Tratante</Label><Input value={form.medicoTratante} onChange={e => updateForm('medicoTratante', e.target.value)} /></div>
-                <div><Label>Cédula Profesional</Label><Input value={form.cedulaProfesional} onChange={e => updateForm('cedulaProfesional', e.target.value)} /></div>
+                <div className="flex items-center gap-2 mb-2">
+                    <input type="checkbox" id="defDocAdm" checked={useDefaultDoctorAdmission} onChange={e => setUseDefaultDoctorAdmission(e.target.checked)} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300"/>
+                    <label htmlFor="defDocAdm" className="text-sm text-slate-600 dark:text-slate-300">Médico Predeterminado (Dr. Gabriel Méndez)</label>
+                </div>
+                <div><Label>Médico Tratante</Label><Input value={form.medicoTratante} onChange={e => updateForm('medicoTratante', e.target.value)} disabled={useDefaultDoctorAdmission} /></div>
+                <div><Label>Cédula Profesional</Label><Input value={form.cedulaProfesional} onChange={e => updateForm('cedulaProfesional', e.target.value)} disabled={useDefaultDoctorAdmission} /></div>
               </div>
             </div>
           </div>
@@ -583,7 +698,7 @@ export default function App() {
             </div>
             <div><Label>Exploración Física Breve</Label>
               <div className="flex flex-wrap gap-2 mb-3">{Object.keys(EXPLORACION_PLANTILLAS).map(key => (<button key={key} onClick={() => {const text = form.exploracion;const separator = text.length > 0 && !text.endsWith('\n') ? '\n\n' : '';updateForm('exploracion', text + separator + key + ':\n' + EXPLORACION_PLANTILLAS[key]);}} className="px-3 py-1.5 bg-slate-700/80 text-white rounded-full text-xs font-bold hover:bg-slate-600 transition-colors flex items-center gap-1 shadow-sm"><Plus size={12}/> {key}</button>))}</div>
-              <TextArea rows={8} value={form.exploracion} onChange={e => updateForm('exploracion', e.target.value)} placeholder="Describe aqui..." className="bg-slate-800 border-slate-700 text-slate-200"/>
+              <TextArea rows={8} value={form.exploracion} onChange={e => updateForm('exploracion', e.target.value)} placeholder="Describe aqui..." />
             </div>
           </div>
         );
@@ -873,7 +988,7 @@ export default function App() {
                     <h1 className="font-bold text-base leading-4 text-white hover:opacity-80 transition-opacity">
                         {appMode === 'admission' ? 'Nota de Ingreso' : appMode === 'evolution' ? 'Nota de Evolución' : 'AINOTAS'}
                     </h1>
-                    <p className="text-[10px] text-white/80 opacity-90 font-medium">By Dr. Gabriel Mendez</p>
+                    <p className="text-[10px] text-white/80 opacity-90 font-medium">By Dr. Gabriel Méndez</p>
                 </div>
             </div>
             <div className="flex gap-0.5">

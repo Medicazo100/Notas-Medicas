@@ -1,4 +1,4 @@
-import { PatientForm, NoteEntry } from "../types";
+import { PatientForm, NoteEntry, EvolutionForm } from "../types";
 
 export const StorageService = {
   saveDraft: (data: PatientForm) => localStorage.setItem('ultra_draft', JSON.stringify(data)),
@@ -8,7 +8,17 @@ export const StorageService = {
     return d ? JSON.parse(d) : null;
   },
   
-  clearDraft: () => localStorage.removeItem('ultra_draft'),
+  saveEvolutionDraft: (data: EvolutionForm) => localStorage.setItem('ultra_draft_evo', JSON.stringify(data)),
+  
+  loadEvolutionDraft: (): EvolutionForm | null => {
+    const d = localStorage.getItem('ultra_draft_evo');
+    return d ? JSON.parse(d) : null;
+  },
+  
+  clearDraft: () => {
+      localStorage.removeItem('ultra_draft');
+      localStorage.removeItem('ultra_draft_evo');
+  },
   
   saveNote: (note: NoteEntry): NoteEntry[] => {
     const notes: NoteEntry[] = JSON.parse(localStorage.getItem('ultra_notes') || '[]');

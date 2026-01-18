@@ -234,12 +234,10 @@ export const AiService = {
       }
     };
 
-    const prompt = `Analiza el siguiente texto (que puede ser un reporte de WhatsApp o notas sueltas) y extrae TODA la información posible para llenar la nota médica.
+    const prompt = `Analiza el siguiente texto y extrae TODA la información posible para llenar la nota médica de ingreso.
     
-    INSTRUCCIONES CRÍTICAS:
-    1. Busca datos administrativos específicos: Folio, Domicilio, Teléfono, Responsable, Cédula Profesional, Médico, Escolaridad, Ocupación.
-    2. Busca datos clínicos detallados.
-    3. Si el texto contiene etiquetas explicitas (ej: "Folio: 123"), úsalas con prioridad.
+    IMPORTANTE: El texto puede estar en un formato estructurado con etiquetas como [MOTIVO], [SIGNOS VITALES], [PLAN], o ser un texto libre.
+    Si encuentras datos explícitos (Ej: "Folio: 123", "TA:120/80"), úsalos prioritariamente.
     
     Texto a analizar: "${textInput}"`;
 
@@ -274,6 +272,10 @@ export const AiService = {
         cama: { type: Type.STRING },
         edad: { type: Type.STRING },
         sexo: { type: Type.STRING },
+        fecha: { type: Type.STRING },
+        hora: { type: Type.STRING },
+        fechaIngreso: { type: Type.STRING },
+        medico: { type: Type.STRING },
         
         subjetivo: { type: Type.STRING },
         
@@ -304,6 +306,7 @@ export const AiService = {
         exploracionFisica: { type: Type.STRING },
         resultadosLaboratorio: { type: Type.STRING },
         
+        diagnosticosIngreso: { type: Type.ARRAY, items: { type: Type.STRING } },
         diagnosticosActivos: { type: Type.ARRAY, items: { type: Type.STRING } },
         analisis: { type: Type.STRING },
         pronostico: { type: Type.STRING },
@@ -313,6 +316,10 @@ export const AiService = {
     };
 
     const prompt = `Analiza el siguiente texto y extrae información para una Nota de Evolución SOAP.
+    
+    IMPORTANTE: El texto puede provenir de un formato de WhatsApp estructurado con secciones como [SUBJETIVO], [OBJETIVO], [ANALISIS], [PLAN].
+    Extrae con precisión campos como "Diagnósticos Ingreso", "Diagnósticos Activos", "Pendientes", "Análisis Clínico", etc.
+    
     Texto: "${textInput}"`;
 
     try {
