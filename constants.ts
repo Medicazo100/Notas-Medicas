@@ -16,6 +16,7 @@ export const INITIAL_EVOLUTION_FORM: EvolutionForm = {
   folio: '', nombre: '', edad: '', sexo: '', cama: '', escolaridad: '', ocupacion: '', fechaIngreso: '', fecha: '', hora: '', 
   medico: 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204',
   familiarResponsable: '',
+  telefonoFamiliar: '', // Nuevo campo inicializado
   subjetivo: '',
   signos: { ta: '', fc: '', fr: '', temp: '', sat: '', gluc: '', peso: '', talla: '', imc: '' },
   g: { o: 4, v: 5, m: 6 },

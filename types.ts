@@ -62,13 +62,14 @@ export interface EvolutionForm {
   edad: string;
   sexo: string;
   cama: string;
-  escolaridad: string; // Nuevo campo
-  ocupacion: string;   // Nuevo campo
+  escolaridad: string; 
+  ocupacion: string;   
   fechaIngreso: string; 
   fecha: string;
   hora: string;
   medico: string;
   familiarResponsable: string;
+  telefonoFamiliar: string; // Nuevo campo
   
   // S - Subjetivo
   subjetivo: string;

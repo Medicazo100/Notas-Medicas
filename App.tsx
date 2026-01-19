@@ -389,9 +389,30 @@ export default function App() {
           <div><h1 style="font-size: 24px; margin: 0; font-weight: bold">NOTA DE INGRESO</h1><p style="margin: 0; font-size: 12px; color: #666">HOSPITAL GENERAL • URGENCIAS</p></div>
           <div style="text-align: right; font-size: 12px"><div><b>Fecha:</b> ${dateStr}</div><div><b>Hora:</b> ${timeStr}</div><div><b>Folio:</b> ${data.folio}</div></div>
         </div>
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; background: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-size: 14px">
-          <div><b>Paciente:</b> ${data.nombre}</div><div><b>Edad:</b> ${data.edad}</div><div><b>Sexo:</b> ${data.sexo}</div>
-        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Paciente:</b> ${data.nombre}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Edad:</b> ${data.edad}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Sexo:</b> ${data.sexo}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Fecha Nac:</b> ${data.fn}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>E. Civil:</b> ${data.estadoCivil}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Tel:</b> ${data.telefono}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;"><b>Escolaridad:</b> ${data.escolaridad}</td>
+                <td style="padding: 4px; border: 1px solid #ddd;" colspan="2"><b>Ocupación:</b> ${data.ocupacion}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;" colspan="3"><b>Domicilio:</b> ${data.domicilio}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;" colspan="3"><b>Responsable:</b> ${data.responsable}</td>
+            </tr>
+        </table>
+
         <div style="margin-bottom: 15px"><h4 style="border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 6px; font-size: 14px; text-transform: uppercase; color: #444">Motivo</h4><p style="font-size: 14px; line-height: 1.5; white-space: pre-wrap">${data.padecimientoActual}</p></div>
         <div style="margin-bottom: 15px"><h4 style="border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 6px; font-size: 14px; text-transform: uppercase; color: #444">Signos Vitales</h4><div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; font-size: 12px">${renderSignos()}<div><b>Glasgow:</b> ${glasgow}</div></div></div>
         <div style="margin-bottom: 15px"><h4 style="border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 6px; font-size: 14px; text-transform: uppercase; color: #444">Exploración Física</h4><p style="font-size: 13px; line-height: 1.4; white-space: pre-wrap">${data.exploracion}</p></div>
@@ -448,7 +469,8 @@ export default function App() {
                  <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Estancia Hospitalaria:</b> ${estanciaCalculada}</td>
             </tr>
             <tr>
-                 <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Informe proporcionado a:</b> ${data.familiarResponsable || 'No registrado'}</td>
+                 <td style="border: 1px solid #ddd; padding: 5px;" colspan="2"><b>Informe proporcionado a:</b> ${data.familiarResponsable || 'No registrado'}</td>
+                 <td style="border: 1px solid #ddd; padding: 5px;"><b>Tel:</b> ${data.telefonoFamiliar || '-'}</td>
             </tr>
             <tr>
                 <td style="border: 1px solid #ddd; padding: 5px;" colspan="3"><b>Elaboró:</b> ${data.medico}</td>
@@ -544,6 +566,10 @@ export default function App() {
 Folio: ${data.folio}
 Paciente: ${data.nombre} (${data.edad}, ${data.sexo})
 Fecha Nac: ${data.fn}
+E. Civil: ${data.estadoCivil} | Escolaridad: ${data.escolaridad}
+Ocupación: ${data.ocupacion}
+Domicilio: ${data.domicilio}
+Responsable: ${data.responsable} (Tel: ${data.telefono})
 Medico Tratante: ${data.medicoTratante} (${data.cedulaProfesional})
 
 [MOTIVO]
@@ -582,6 +608,7 @@ Edad: ${data.edad} Sexo: ${data.sexo}
 Folio: ${data.folio} Cama: ${data.cama}
 Ingreso: ${data.fechaIngreso}
 Medico: ${data.medico}
+Informes a: ${data.familiarResponsable} (Tel: ${data.telefonoFamiliar})
 
 [SUBJETIVO]
 ${data.subjetivo}
@@ -773,6 +800,10 @@ ${data.plan}`;
             <div className="mt-2">
                 <Label>Familiar Responsable (Informe)</Label>
                 <Input value={evoForm.familiarResponsable} onChange={e => updateEvoForm('familiarResponsable', e.target.value)} placeholder="Nombre del familiar a quien se brinda informes" />
+            </div>
+            <div className="mt-2">
+                <Label>Teléfono Familiar</Label>
+                <Input value={evoForm.telefonoFamiliar} onChange={e => updateEvoForm('telefonoFamiliar', e.target.value)} placeholder="10 dígitos" />
             </div>
 
             <SectionTitle><UserCheck size={20}/> Médico</SectionTitle>

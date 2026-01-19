@@ -276,6 +276,8 @@ export const AiService = {
         hora: { type: Type.STRING },
         fechaIngreso: { type: Type.STRING },
         medico: { type: Type.STRING },
+        familiarResponsable: { type: Type.STRING },
+        telefonoFamiliar: { type: Type.STRING },
         
         subjetivo: { type: Type.STRING },
         
