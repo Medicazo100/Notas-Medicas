@@ -230,38 +230,102 @@ export default function App() {
     if (!importText.trim()) return showToast('Pega un texto primero');
     setIsImporting(true);
 
-    if (appMode === 'admission') {
-        const parsedData = await AiService.parseData(importText);
-        setIsImporting(false);
-
-        if (parsedData) {
-          setForm(prev => ({
-            ...prev,
-            ...parsedData,
-            signos: { ...prev.signos, ...parsedData.signos },
-            g: { ...prev.g, ...parsedData.g }
-          }));
-          setImportText('');
-          showToast('Formulario autocompletado e integrado en todas las secciones');
-        } else {
-          showToast('Error al interpretar los datos');
-        }
-    } else {
-        const parsedData = await AiService.parseEvolutionData(importText);
-        setIsImporting(false);
-
-        if (parsedData) {
-            setEvoForm(prev => ({
+    try {
+        if (appMode === 'admission') {
+            const parsedData = await AiService.parseData(importText);
+            
+            if (parsedData) {
+              setForm(prev => ({
                 ...prev,
                 ...parsedData,
-                signos: { ...prev.signos, ...parsedData.signos },
-                g: { ...prev.g, ...parsedData.g }
-            }));
-            setImportText('');
-            showToast('Evolución autocompletada e integrada');
+                // Merge superficial seguro para signos y g
+                signos: { ...prev.signos, ...(parsedData.signos || {}) },
+                g: { ...prev.g, ...(parsedData.g || {}) }
+              }));
+              setImportText('');
+              showToast('Formulario autocompletado e integrado en todas las secciones');
+            } else {
+              // No borramos texto si falla
+              showToast('No se pudieron interpretar los datos. Intenta mejorar el formato.');
+            }
         } else {
-            showToast('Error al interpretar los datos de evolución');
+            // LÓGICA ROBUSTA PARA EVOLUCIÓN
+            const parsedData = await AiService.parseEvolutionData(importText);
+
+            if (parsedData) {
+                setEvoForm(prev => {
+                    // Helper: Solo actualiza si el nuevo valor tiene contenido real
+                    const mergeField = (newVal: any, oldVal: any) => 
+                        (newVal !== undefined && newVal !== "" && newVal !== null) ? newVal : oldVal;
+
+                    // Merge inteligente para Signos (preserva los que ya existan)
+                    const newSignos = { ...prev.signos };
+                    if (parsedData.signos) {
+                        Object.keys(newSignos).forEach(key => {
+                            const k = key as keyof typeof newSignos;
+                            if (parsedData.signos && parsedData.signos[k]) {
+                                newSignos[k] = String(parsedData.signos[k]);
+                            }
+                        });
+                    }
+
+                    // Merge inteligente para Glasgow
+                    const newG = { ...prev.g };
+                    if (parsedData.g) {
+                        if (parsedData.g.o) newG.o = parsedData.g.o;
+                        if (parsedData.g.v) newG.v = parsedData.g.v;
+                        if (parsedData.g.m) newG.m = parsedData.g.m;
+                    }
+
+                    return {
+                        ...prev,
+                        // Campos directos con mergeField
+                        folio: mergeField(parsedData.folio, prev.folio),
+                        cama: mergeField(parsedData.cama, prev.cama),
+                        nombre: mergeField(parsedData.nombre, prev.nombre),
+                        edad: mergeField(parsedData.edad, prev.edad),
+                        sexo: mergeField(parsedData.sexo, prev.sexo),
+                        fecha: mergeField(parsedData.fecha, prev.fecha),
+                        hora: mergeField(parsedData.hora, prev.hora),
+                        fechaIngreso: mergeField(parsedData.fechaIngreso, prev.fechaIngreso),
+                        medico: mergeField(parsedData.medico, prev.medico),
+                        familiarResponsable: mergeField(parsedData.familiarResponsable, prev.familiarResponsable),
+                        telefonoFamiliar: mergeField(parsedData.telefonoFamiliar, prev.telefonoFamiliar),
+                        
+                        subjetivo: mergeField(parsedData.subjetivo, prev.subjetivo),
+                        exploracionFisica: mergeField(parsedData.exploracionFisica, prev.exploracionFisica),
+                        resultadosLaboratorio: mergeField(parsedData.resultadosLaboratorio, prev.resultadosLaboratorio),
+                        analisis: mergeField(parsedData.analisis, prev.analisis),
+                        pronostico: mergeField(parsedData.pronostico, prev.pronostico),
+                        pendientes: mergeField(parsedData.pendientes, prev.pendientes),
+                        plan: mergeField(parsedData.plan, prev.plan),
+                        pupilas: mergeField(parsedData.pupilas, prev.pupilas),
+
+                        // Objetos protegidos
+                        signos: newSignos,
+                        g: newG,
+
+                        // Arrays: Validación y merge
+                        diagnosticosIngreso: (Array.isArray(parsedData.diagnosticosIngreso) && parsedData.diagnosticosIngreso.length > 0) 
+                            ? parsedData.diagnosticosIngreso 
+                            : prev.diagnosticosIngreso,
+                        diagnosticosActivos: (Array.isArray(parsedData.diagnosticosActivos) && parsedData.diagnosticosActivos.length > 0) 
+                            ? parsedData.diagnosticosActivos 
+                            : prev.diagnosticosActivos,
+                    };
+                });
+                
+                setImportText('');
+                showToast('Evolución autocompletada e integrada correctamente');
+            } else {
+                showToast('No se encontraron datos estructurados. Revisa el texto e intenta de nuevo.');
+            }
         }
+    } catch (error) {
+        console.error("Error en autocompletado:", error);
+        showToast('Ocurrió un error al procesar el texto.');
+    } finally {
+        setIsImporting(false);
     }
   };
 
