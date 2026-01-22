@@ -897,29 +897,7 @@ ${data.plan}`;
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <StepHeader icon={User} title="Datos Generales" subtitle="Identificación del paciente y tiempos de la nota." />
             
-            {/* Smart Fill Section - Moved to Step 1 for better Mobile UX */}
-            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 shadow-sm mb-4">
-              <div className="flex justify-between items-center mb-2">
-                 <h4 className="text-indigo-600 dark:text-indigo-400 font-bold text-sm flex items-center gap-2"><Wand2 size={16}/> Autocompletar</h4>
-                 {importText && <button onClick={() => setImportText('')} className="text-xs text-slate-400 hover:text-slate-600">Limpiar</button>}
-              </div>
-              <div className="relative">
-                  <TextArea 
-                    rows={2} 
-                    value={importText} 
-                    onChange={e => setImportText(e.target.value)} 
-                    placeholder="Pega el reporte aquí para llenar automáticamente..." 
-                    className="bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-700 text-slate-800 dark:text-slate-200 text-xs pr-12 resize-none"
-                  />
-                  <button 
-                    onClick={handleSmartFill} 
-                    disabled={isImporting || !importText.trim()} 
-                    className="absolute right-2 bottom-2 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {isImporting ? <Loader2 className="animate-spin" size={16}/> : <Wand2 size={16}/>}
-                  </button>
-              </div>
-            </div>
+            {/* Removed redundant Smart Fill Section from Step 1 */}
 
             <div className="grid grid-cols-2 gap-4">
                 <div><Label>Folio / Expediente</Label><Input value={evoForm.folio} onChange={e => updateEvoForm('folio', e.target.value)} /></div>
