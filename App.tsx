@@ -139,8 +139,6 @@ export default function App() {
         const defaultDoc = 'Dr. Gabriel Méndez Ortiz - Céd. Prof. 7630204';
         if (useDefaultDoctor) {
             updateEvoForm('medico', defaultDoc);
-        } else if (evoForm.medico === defaultDoc) {
-            updateEvoForm('medico', ''); 
         }
     }
   }, [useDefaultDoctor, appMode]);
@@ -153,10 +151,7 @@ export default function App() {
         if (useDefaultDoctorAdmission) {
             updateForm('medicoTratante', defName);
             updateForm('cedulaProfesional', defCedula);
-        } else if (form.medicoTratante === defName) {
-            updateForm('medicoTratante', '');
-            updateForm('cedulaProfesional', '');
-        }
+        } 
     }
   }, [useDefaultDoctorAdmission, appMode]);
 
@@ -580,11 +575,13 @@ export default function App() {
 
   const downloadWord = () => {
     if (appMode === 'admission') {
-        if (!form.nombre) return showToast('Falta el nombre del paciente');
+        if (!form.nombre.trim()) return showToast('Falta el nombre del paciente');
+        if (!form.sintomaPrincipal.trim()) return showToast('Falta el síntoma principal');
+        if (!form.padecimientoActual.trim()) return showToast('Falta el padecimiento actual');
         const html = generateDocHTML(form);
         downloadFile(html, `Nota_Ingreso_${form.nombre.replace(/\s+/g, '_')}`);
     } else {
-        if (!evoForm.nombre) return showToast('Falta el nombre del paciente');
+        if (!evoForm.nombre.trim()) return showToast('Falta el nombre del paciente');
         const html = generateEvolutionDocHTML(evoForm);
         downloadFile(html, `Nota_Evolucion_${evoForm.nombre.replace(/\s+/g, '_')}`);
     }
@@ -667,9 +664,11 @@ ${data.plan}`;
     let text = '';
     const name = appMode === 'admission' ? form.nombre : evoForm.nombre;
     
-    if (!name) return showToast('Falta el nombre del paciente');
+    if (!name.trim()) return showToast('Falta el nombre del paciente');
     
     if (appMode === 'admission') {
+        if (!form.sintomaPrincipal.trim()) return showToast('Falta el síntoma principal');
+        if (!form.padecimientoActual.trim()) return showToast('Falta el padecimiento actual');
         text = generateStructuredAdmissionText(form);
     } else {
         text = generateStructuredEvolutionText(evoForm);
@@ -679,6 +678,21 @@ ${data.plan}`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
     showToast('Abriendo WhatsApp...');
+  };
+  
+  const handleNext = () => {
+    if (appMode === 'admission') {
+        if (step === 1 && !form.nombre.trim()) return showToast('Falta el nombre del paciente');
+        if (step === 2) {
+            if (!form.sintomaPrincipal.trim()) return showToast('Falta el síntoma principal');
+            if (!form.padecimientoActual.trim()) return showToast('Falta el padecimiento actual');
+        }
+    } else if (appMode === 'evolution') {
+        // En evolución el paso 1 tiene el nombre
+        if (step === 1 && !evoForm.nombre.trim()) return showToast('Falta el nombre del paciente');
+    }
+    
+    setStep(step + 1);
   };
 
   // --- Renderizado de Pasos de Admisión (Existente) ---
@@ -711,11 +725,35 @@ ${data.plan}`;
               <SectionTitle><Stethoscope size={20}/> Datos del Médico</SectionTitle>
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" id="defDocAdm" checked={useDefaultDoctorAdmission} onChange={e => setUseDefaultDoctorAdmission(e.target.checked)} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300"/>
-                    <label htmlFor="defDocAdm" className="text-sm text-slate-600 dark:text-slate-300">Médico Predeterminado (Dr. Gabriel Méndez)</label>
+                    <input 
+                        type="checkbox" 
+                        id="defDocAdm" 
+                        checked={useDefaultDoctorAdmission} 
+                        onChange={e => setUseDefaultDoctorAdmission(e.target.checked)} 
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                    />
+                    <label htmlFor="defDocAdm" className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                        Utilizar datos predeterminados (Dr. Gabriel Méndez)
+                    </label>
                 </div>
-                <div><Label>Médico Tratante</Label><Input value={form.medicoTratante} onChange={e => updateForm('medicoTratante', e.target.value)} disabled={useDefaultDoctorAdmission} /></div>
-                <div><Label>Cédula Profesional</Label><Input value={form.cedulaProfesional} onChange={e => updateForm('cedulaProfesional', e.target.value)} disabled={useDefaultDoctorAdmission} /></div>
+                <div>
+                    <Label>Nombre del Médico Tratante</Label>
+                    <Input 
+                        value={form.medicoTratante} 
+                        onChange={e => updateForm('medicoTratante', e.target.value)} 
+                        readOnly={useDefaultDoctorAdmission} 
+                        className={useDefaultDoctorAdmission ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed' : ''}
+                    />
+                </div>
+                <div>
+                    <Label>Cédula Profesional</Label>
+                    <Input 
+                        value={form.cedulaProfesional} 
+                        onChange={e => updateForm('cedulaProfesional', e.target.value)} 
+                        readOnly={useDefaultDoctorAdmission} 
+                        className={useDefaultDoctorAdmission ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed' : ''}
+                    />
+                </div>
               </div>
             </div>
           </div>
@@ -793,6 +831,31 @@ ${data.plan}`;
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <StepHeader icon={User} title="Datos Generales" subtitle="Identificación del paciente y tiempos de la nota." />
+            
+            {/* Smart Fill Section - Moved to Step 1 for better Mobile UX */}
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 shadow-sm mb-4">
+              <div className="flex justify-between items-center mb-2">
+                 <h4 className="text-indigo-600 dark:text-indigo-400 font-bold text-sm flex items-center gap-2"><Wand2 size={16}/> Autocompletar</h4>
+                 {importText && <button onClick={() => setImportText('')} className="text-xs text-slate-400 hover:text-slate-600">Limpiar</button>}
+              </div>
+              <div className="relative">
+                  <TextArea 
+                    rows={2} 
+                    value={importText} 
+                    onChange={e => setImportText(e.target.value)} 
+                    placeholder="Pega el reporte aquí para llenar automáticamente..." 
+                    className="bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-700 text-slate-800 dark:text-slate-200 text-xs pr-12 resize-none"
+                  />
+                  <button 
+                    onClick={handleSmartFill} 
+                    disabled={isImporting || !importText.trim()} 
+                    className="absolute right-2 bottom-2 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {isImporting ? <Loader2 className="animate-spin" size={16}/> : <Wand2 size={16}/>}
+                  </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 <div><Label>Folio / Expediente</Label><Input value={evoForm.folio} onChange={e => updateEvoForm('folio', e.target.value)} /></div>
                 <div><Label>Cama</Label><Input value={evoForm.cama} onChange={e => updateEvoForm('cama', e.target.value)} /></div>
@@ -839,12 +902,29 @@ ${data.plan}`;
                 <Input value={evoForm.telefonoFamiliar} onChange={e => updateEvoForm('telefonoFamiliar', e.target.value)} placeholder="10 dígitos" />
             </div>
 
-            <SectionTitle><UserCheck size={20}/> Médico</SectionTitle>
+            <SectionTitle><UserCheck size={20}/> Médico Responsable</SectionTitle>
              <div className="flex items-center gap-2 mb-2">
-                <input type="checkbox" id="defDoc" checked={useDefaultDoctor} onChange={e => setUseDefaultDoctor(e.target.checked)} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"/>
-                <label htmlFor="defDoc" className="text-sm text-slate-600 dark:text-slate-300">Médico Predeterminado (Dr. Gabriel Méndez)</label>
+                <input 
+                    type="checkbox" 
+                    id="defDoc" 
+                    checked={useDefaultDoctor} 
+                    onChange={e => setUseDefaultDoctor(e.target.checked)} 
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <label htmlFor="defDoc" className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                    Utilizar datos predeterminados (Dr. Gabriel Méndez)
+                </label>
             </div>
-            <Input value={evoForm.medico} onChange={e => updateEvoForm('medico', e.target.value)} placeholder="Nombre del médico que elabora" disabled={useDefaultDoctor}/>
+            <div className="mt-3">
+                <Label>Nombre y Cédula</Label>
+                <Input 
+                    value={evoForm.medico} 
+                    onChange={e => updateEvoForm('medico', e.target.value)} 
+                    placeholder="Nombre del médico que elabora" 
+                    readOnly={useDefaultDoctor} 
+                    className={useDefaultDoctor ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed' : ''}
+                />
+            </div>
           </div>
         );
       case 2:
@@ -991,11 +1071,23 @@ ${data.plan}`;
                    <TextArea rows={12} value={evoForm.plan} onChange={e => updateEvoForm('plan', e.target.value)} placeholder="1. Dieta... 2. Soluciones... 3. Medicamentos..." className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 font-mono text-sm"/>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-sm mt-4">
-                  <h4 className="text-emerald-600 dark:text-emerald-400 font-bold mb-2 flex items-center gap-2"><Wand2 size={18}/> Autocompletar</h4>
-                  <TextArea rows={4} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Texto libre..." className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-300 text-sm shadow-sm"/>
-                  <button onClick={handleSmartFill} disabled={isImporting} className="w-full bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 mt-4 transition-all shadow-md">
-                    {isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Rellenar
+                {/* Autocomplete Section for Evolution Note - Step 5 */}
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-2xl border-2 border-indigo-100 dark:border-indigo-800 shadow-sm mt-4">
+                  <h4 className="text-indigo-600 dark:text-indigo-400 font-bold mb-2 flex items-center gap-2"><Wand2 size={18}/> Autocompletar Formato</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pega un reporte o texto libre para llenar automáticamente todos los campos de la nota.</p>
+                  <TextArea 
+                    rows={4} 
+                    value={importText} 
+                    onChange={e => setImportText(e.target.value)} 
+                    placeholder="Pega aquí la información..." 
+                    className="bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-300 text-sm shadow-sm"
+                  />
+                  <button 
+                    onClick={handleSmartFill} 
+                    disabled={isImporting} 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 mt-4 transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Procesar e Integrar Información
                   </button>
                 </div>
             </div>
@@ -1092,7 +1184,7 @@ ${data.plan}`;
             <div className="flex justify-between mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 items-center">
                 <button onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} className="flex items-center gap-2 text-slate-400 disabled:opacity-30 hover:text-emerald-600 font-medium transition-colors"><ChevronLeft size={20}/> Atrás</button>
                 {!isLastStep ? (
-                    <button onClick={() => setStep(step + 1)} className={`${appMode==='admission'?'bg-emerald-600 hover:bg-emerald-700':'bg-indigo-600 hover:bg-indigo-700'} text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-lg`}>
+                    <button onClick={handleNext} className={`${appMode==='admission'?'bg-emerald-600 hover:bg-emerald-700':'bg-indigo-600 hover:bg-indigo-700'} text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-lg`}>
                         Siguiente <ChevronRight size={18}/>
                     </button>
                 ) : (
