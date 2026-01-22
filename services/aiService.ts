@@ -89,8 +89,10 @@ export const AiService = {
         }
       });
       
-      const text = response.text;
-      return text ? JSON.parse(text) : null;
+      // Limpieza robusta de JSON
+      const rawText = response.text || "{}";
+      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanText);
     } catch (error) {
       console.error("Service Error:", error);
       return null;
@@ -156,7 +158,9 @@ export const AiService = {
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: schema }
       });
-      return response.text ? JSON.parse(response.text) : null;
+      const rawText = response.text || "{}";
+      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanText);
     } catch (e) { console.error(e); return null; }
   },
 
@@ -207,13 +211,13 @@ export const AiService = {
           }
         },
         
-        // Glasgow y Pupilas
+        // Glasgow y Pupilas (Cambiado a STRING para mayor robustez)
         g: {
           type: Type.OBJECT,
           properties: {
-            o: { type: Type.INTEGER },
-            v: { type: Type.INTEGER },
-            m: { type: Type.INTEGER },
+            o: { type: Type.STRING },
+            v: { type: Type.STRING },
+            m: { type: Type.STRING },
           }
         },
         pupilas: { type: Type.STRING },
@@ -236,8 +240,9 @@ export const AiService = {
 
     const prompt = `Analiza el siguiente texto y extrae TODA la información posible para llenar la nota médica de ingreso.
     
-    IMPORTANTE: El texto puede estar en un formato estructurado con etiquetas como [MOTIVO], [SIGNOS VITALES], [PLAN], o ser un texto libre.
-    Si encuentras datos explícitos (Ej: "Folio: 123", "TA:120/80"), úsalos prioritariamente.
+    IMPORTANTE: 
+    1. Si un dato no está presente, devuelve una cadena vacía "".
+    2. Si encuentras datos numéricos (como Glasgow), devuélvelos como texto (ej: "4").
     
     Texto a analizar: "${textInput}"`;
 
@@ -251,8 +256,9 @@ export const AiService = {
         }
       });
       
-      const text = response.text;
-      return text ? JSON.parse(text) : null;
+      const rawText = response.text || "{}";
+      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanText);
     } catch (error) {
       console.error("Parsing Error:", error);
       return null;
@@ -264,6 +270,7 @@ export const AiService = {
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
+    // Esquema ROBUSTO: Todo es STRING o ARRAY de STRINGS para evitar errores de tipo si la IA alucina formatos
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -295,12 +302,13 @@ export const AiService = {
             imc: { type: Type.STRING },
           }
         },
+        // Cambiado de INTEGER a STRING para evitar fallos si la IA envía "4 (ocular)"
         g: {
           type: Type.OBJECT,
           properties: {
-            o: { type: Type.INTEGER },
-            v: { type: Type.INTEGER },
-            m: { type: Type.INTEGER },
+            o: { type: Type.STRING },
+            v: { type: Type.STRING },
+            m: { type: Type.STRING },
           }
         },
         pupilas: { type: Type.STRING },
@@ -317,10 +325,14 @@ export const AiService = {
       }
     };
 
-    const prompt = `Analiza el siguiente texto y extrae información para una Nota de Evolución SOAP.
-    
-    IMPORTANTE: El texto puede provenir de un formato de WhatsApp estructurado con secciones como [SUBJETIVO], [OBJETIVO], [ANALISIS], [PLAN].
-    Extrae con precisión campos como "Diagnósticos Ingreso", "Diagnósticos Activos", "Pendientes", "Análisis Clínico", etc.
+    const prompt = `Analiza el texto proporcionado (que puede ser un reporte de guardia, mensaje de WhatsApp o nota desordenada) y extrae información para llenar una Nota de Evolución SOAP.
+
+    REGLAS DE EXTRACCIÓN:
+    1. Extrae los signos vitales exactamente como aparecen.
+    2. En 'Subjetivo', resume lo que refiere el paciente.
+    3. En 'Diagnósticos', separa por items.
+    4. Si un dato no existe en el texto, déjalo como cadena vacía "". NO inventes información.
+    5. Para la escala de Glasgow, extrae solo el número como texto (ej: "4").
     
     Texto: "${textInput}"`;
 
@@ -333,8 +345,12 @@ export const AiService = {
           responseSchema: schema
         }
       });
-      const text = response.text;
-      return text ? JSON.parse(text) : null;
+      
+      const rawText = response.text || "{}";
+      // Limpieza crítica: Eliminar bloques de código markdown si la IA los incluye
+      const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      return JSON.parse(cleanText);
     } catch (error) {
       console.error("Evolution Parsing Error:", error);
       return null;
