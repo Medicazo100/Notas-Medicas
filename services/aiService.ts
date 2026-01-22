@@ -270,84 +270,76 @@ export const AiService = {
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Esquema ROBUSTO: Todo es STRING o ARRAY de STRINGS para evitar errores de tipo si la IA alucina formatos
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        nombre: { type: Type.STRING },
-        folio: { type: Type.STRING },
-        cama: { type: Type.STRING },
-        edad: { type: Type.STRING },
-        sexo: { type: Type.STRING },
-        fecha: { type: Type.STRING },
-        hora: { type: Type.STRING },
-        fechaIngreso: { type: Type.STRING },
-        medico: { type: Type.STRING },
-        familiarResponsable: { type: Type.STRING },
-        telefonoFamiliar: { type: Type.STRING },
-        
-        subjetivo: { type: Type.STRING },
-        
-        signos: {
-          type: Type.OBJECT,
-          properties: {
-            ta: { type: Type.STRING },
-            fc: { type: Type.STRING },
-            fr: { type: Type.STRING },
-            temp: { type: Type.STRING },
-            sat: { type: Type.STRING },
-            gluc: { type: Type.STRING },
-            peso: { type: Type.STRING },
-            talla: { type: Type.STRING },
-            imc: { type: Type.STRING },
-          }
-        },
-        // Cambiado de INTEGER a STRING para evitar fallos si la IA envía "4 (ocular)"
-        g: {
-          type: Type.OBJECT,
-          properties: {
-            o: { type: Type.STRING },
-            v: { type: Type.STRING },
-            m: { type: Type.STRING },
-          }
-        },
-        pupilas: { type: Type.STRING },
-        
-        exploracionFisica: { type: Type.STRING },
-        resultadosLaboratorio: { type: Type.STRING },
-        
-        diagnosticosIngreso: { type: Type.ARRAY, items: { type: Type.STRING } },
-        diagnosticosActivos: { type: Type.ARRAY, items: { type: Type.STRING } },
-        analisis: { type: Type.STRING },
-        pronostico: { type: Type.STRING },
-        pendientes: { type: Type.STRING },
-        plan: { type: Type.STRING }
-      }
-    };
+    // NOTA: No usamos `responseSchema` estricto aquí para aumentar la robustez.
+    // Al procesar texto no estructurado, el esquema estricto a veces falla si el modelo
+    // no encuentra datos exactos para llenar la estructura.
+    // En su lugar, usamos `responseMimeType: "application/json"` y un prompt fuerte.
 
     const prompt = `Analiza el texto proporcionado (que puede ser un reporte de guardia, mensaje de WhatsApp o nota desordenada) y extrae información para llenar una Nota de Evolución SOAP.
+    
+    Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta.
+    Si un campo no tiene información en el texto, usa una cadena vacía "".
+    
+    ESTRUCTURA JSON ESPERADA:
+    {
+      "nombre": "string",
+      "folio": "string",
+      "cama": "string",
+      "edad": "string",
+      "sexo": "string",
+      "fecha": "string",
+      "hora": "string",
+      "fechaIngreso": "string",
+      "medico": "string",
+      "familiarResponsable": "string",
+      "telefonoFamiliar": "string",
+      "subjetivo": "string",
+      "signos": {
+        "ta": "string",
+        "fc": "string",
+        "fr": "string",
+        "temp": "string",
+        "sat": "string",
+        "gluc": "string",
+        "peso": "string",
+        "talla": "string",
+        "imc": "string"
+      },
+      "g": {
+        "o": "string",
+        "v": "string",
+        "m": "string"
+      },
+      "pupilas": "string",
+      "exploracionFisica": "string",
+      "resultadosLaboratorio": "string",
+      "diagnosticosIngreso": ["string"],
+      "diagnosticosActivos": ["string"],
+      "analisis": "string",
+      "pronostico": "string",
+      "pendientes": "string",
+      "plan": "string"
+    }
 
     REGLAS DE EXTRACCIÓN:
     1. Extrae los signos vitales exactamente como aparecen.
     2. En 'Subjetivo', resume lo que refiere el paciente.
-    3. En 'Diagnósticos', separa por items.
-    4. Si un dato no existe en el texto, déjalo como cadena vacía "". NO inventes información.
-    5. Para la escala de Glasgow, extrae solo el número como texto (ej: "4").
+    3. En 'Diagnósticos', separa por items en el array.
+    4. Para la escala de Glasgow (g), extrae solo el número como texto (ej: "4") para o, v, m. Si solo tienes el total, intenta estimar o pon "0".
     
-    Texto: "${textInput}"`;
+    Texto a analizar: "${textInput}"`;
 
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: schema
+          responseMimeType: "application/json"
+          // Sin responseSchema para evitar errores de validación en datos incompletos
         }
       });
       
       const rawText = response.text || "{}";
-      // Limpieza crítica: Eliminar bloques de código markdown si la IA los incluye
       const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       
       return JSON.parse(cleanText);
