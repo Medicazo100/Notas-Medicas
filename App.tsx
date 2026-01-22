@@ -3,7 +3,7 @@ import {
   Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
   Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
-  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy
+  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy, RotateCcw
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
@@ -369,6 +369,39 @@ export default function App() {
     const updatedNotes = StorageService.saveNote(note);
     setNotes(updatedNotes);
     return updatedNotes;
+  };
+
+  const handleReset = () => {
+    if (window.confirm('¿Deseas reiniciar y limpiar todos los campos para una nueva nota?')) {
+        // Helper para copia profunda
+        const deepCopy = (obj: any) => JSON.parse(JSON.stringify(obj));
+
+        if (appMode === 'admission') {
+            setForm(deepCopy(INITIAL_FORM));
+            localStorage.removeItem('ultra_draft');
+            setUseDefaultDoctorAdmission(true);
+        } else {
+            const now = new Date();
+            const cleanEvo = deepCopy(INITIAL_EVOLUTION_FORM);
+            setEvoForm({
+                ...cleanEvo,
+                fecha: now.toLocaleDateString('es-MX'),
+                hora: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            });
+            localStorage.removeItem('ultra_draft_evo');
+            setUseDefaultDoctor(true);
+        }
+        setStep(1);
+        
+        // Limpiar estados auxiliares
+        setCustomDx('');
+        setCustomAntecedente('');
+        setCustomIngresoDx('');
+        setImportText('');
+        setProcessingResult(null);
+        
+        showToast('Formulario reiniciado');
+    }
   };
 
   // --- Generador HTML Nota Ingreso ---
@@ -1064,6 +1097,13 @@ ${data.plan}`;
                     </button>
                 ) : (
                 <div className="flex gap-4">
+                    <button 
+                        onClick={handleReset} 
+                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 text-rose-500 border-rose-100 hover:border-rose-200 dark:border-slate-700 shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                        title="Nueva Nota (Limpiar)"
+                    >
+                        <RotateCcw size={24} strokeWidth={2.5} />
+                    </button>
                     <button 
                     onClick={downloadWord} 
                     className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 ${appMode==='admission'?'text-emerald-600 border-emerald-100':'text-indigo-600 border-indigo-100'} hover:border-current shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
