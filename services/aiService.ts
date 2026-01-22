@@ -277,6 +277,8 @@ export const AiService = {
 
     const prompt = `Analiza el texto proporcionado (que puede ser un reporte de guardia, mensaje de WhatsApp o nota desordenada) y extrae información para llenar una Nota de Evolución SOAP.
     
+    IMPORTANTE: El texto puede tener un formato estructurado con etiquetas como [DATOS_GENERALES], [SUBJETIVO], [OBJETIVO]. Si es así, usa esas etiquetas para mapear la información con total precisión a los campos del JSON.
+    
     Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta.
     Si un campo no tiene información en el texto, usa una cadena vacía "".
     

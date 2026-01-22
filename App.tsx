@@ -694,28 +694,29 @@ ${data.plan}`;
 
   // --- NUEVO: Generador de Texto Estructurado para Evolución ---
   const generateStructuredEvolutionText = (data: EvolutionForm) => {
-    const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
-    return `**NOTA DE EVOLUCIÓN**
-Fecha: ${data.fecha} Hora: ${data.hora}
-Paciente: ${data.nombre}
-Edad: ${data.edad} Sexo: ${data.sexo}
-Folio: ${data.folio} Cama: ${data.cama}
-Ingreso: ${data.fechaIngreso}
-Medico: ${data.medico}
-Informes a: ${data.familiarResponsable} (Tel: ${data.telefonoFamiliar})
+    const glasgowTotal = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
+    return `*** NOTA DE EVOLUCIÓN (FORMATO INTERCAMBIO) ***
+[DATOS_GENERALES]
+Nombre: ${data.nombre} | Edad: ${data.edad} | Sexo: ${data.sexo}
+Folio: ${data.folio} | Cama: ${data.cama}
+Fecha Nota: ${data.fecha} | Hora: ${data.hora}
+Fecha Ingreso: ${data.fechaIngreso}
+Escolaridad: ${data.escolaridad} | Ocupación: ${data.ocupacion}
+Médico: ${data.medico}
+Familiar: ${data.familiarResponsable} (Tel: ${data.telefonoFamiliar})
 
 [SUBJETIVO]
 ${data.subjetivo}
 
 [OBJETIVO]
-TA:${data.signos.ta} FC:${data.signos.fc} FR:${data.signos.fr} Temp:${data.signos.temp} Sat:${data.signos.sat} Gluc:${data.signos.gluc}
-Glasgow: ${glasgow} (${data.g.o}O, ${data.g.v}V, ${data.g.m}M) Pupilas: ${data.pupilas}
+Signos Vitales: TA:${data.signos.ta} | FC:${data.signos.fc} | FR:${data.signos.fr} | Temp:${data.signos.temp} | SatO2:${data.signos.sat} | Gluc:${data.signos.gluc} | Peso:${data.signos.peso} | Talla:${data.signos.talla}
+Neurológico: Glasgow ${glasgowTotal} (O${data.g.o} V${data.g.v} M${data.g.m}) | Pupilas: ${data.pupilas}
 Exploración Física: ${data.exploracionFisica}
-Laboratorios: ${data.resultadosLaboratorio}
+Laboratorios/Gabinete: ${data.resultadosLaboratorio}
 
 [ANALISIS]
-Diagnósticos Ingreso: ${data.diagnosticosIngreso.join(', ')}
-Diagnósticos Activos: ${data.diagnosticosActivos.join(', ')}
+Diagnósticos Ingreso: ${data.diagnosticosIngreso.join('; ')}
+Diagnósticos Activos: ${data.diagnosticosActivos.join('; ')}
 Análisis Clínico: ${data.analisis}
 Pronóstico: ${data.pronostico}
 Pendientes: ${data.pendientes}
