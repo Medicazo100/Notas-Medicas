@@ -270,64 +270,77 @@ export const AiService = {
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // NOTA: No usamos `responseSchema` estricto aquí para aumentar la robustez.
-    // Al procesar texto no estructurado, el esquema estricto a veces falla si el modelo
-    // no encuentra datos exactos para llenar la estructura.
-    // En su lugar, usamos `responseMimeType: "application/json"` y un prompt fuerte.
+    // Implementación idéntica a parseData (Ingreso) usando Schema
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        // Datos Generales
+        folio: { type: Type.STRING },
+        nombre: { type: Type.STRING },
+        cama: { type: Type.STRING },
+        edad: { type: Type.STRING },
+        sexo: { type: Type.STRING },
+        escolaridad: { type: Type.STRING },
+        ocupacion: { type: Type.STRING },
+        
+        // Tiempos y Personal
+        fechaIngreso: { type: Type.STRING },
+        fecha: { type: Type.STRING },
+        hora: { type: Type.STRING },
+        medico: { type: Type.STRING },
+        familiarResponsable: { type: Type.STRING },
+        telefonoFamiliar: { type: Type.STRING },
+        
+        // Subjetivo
+        subjetivo: { type: Type.STRING },
+        
+        // Objetos Anidados (Signos y Glasgow)
+        signos: {
+          type: Type.OBJECT,
+          properties: {
+            ta: { type: Type.STRING },
+            fc: { type: Type.STRING },
+            fr: { type: Type.STRING },
+            temp: { type: Type.STRING },
+            sat: { type: Type.STRING },
+            gluc: { type: Type.STRING },
+            peso: { type: Type.STRING },
+            talla: { type: Type.STRING },
+            imc: { type: Type.STRING },
+          }
+        },
+        g: {
+          type: Type.OBJECT,
+          properties: {
+            o: { type: Type.STRING },
+            v: { type: Type.STRING },
+            m: { type: Type.STRING },
+          }
+        },
+        pupilas: { type: Type.STRING },
+        
+        // Objetivo Restante
+        exploracionFisica: { type: Type.STRING },
+        resultadosLaboratorio: { type: Type.STRING },
+        
+        // Análisis y Arrays
+        diagnosticosIngreso: { type: Type.ARRAY, items: { type: Type.STRING } },
+        diagnosticosActivos: { type: Type.ARRAY, items: { type: Type.STRING } },
+        analisis: { type: Type.STRING },
+        pronostico: { type: Type.STRING },
+        pendientes: { type: Type.STRING },
+        
+        // Plan
+        plan: { type: Type.STRING }
+      }
+    };
 
-    const prompt = `Analiza el texto proporcionado (que puede ser un reporte de guardia, mensaje de WhatsApp o nota desordenada) y extrae información para llenar una Nota de Evolución SOAP.
+    const prompt = `Analiza el siguiente texto y extrae TODA la información posible para llenar la Nota de Evolución (SOAP).
     
-    IMPORTANTE: El texto puede tener un formato estructurado con etiquetas como [DATOS_GENERALES], [SUBJETIVO], [OBJETIVO]. Si es así, usa esas etiquetas para mapear la información con total precisión a los campos del JSON.
-    
-    Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta.
-    Si un campo no tiene información en el texto, usa una cadena vacía "".
-    
-    ESTRUCTURA JSON ESPERADA:
-    {
-      "nombre": "string",
-      "folio": "string",
-      "cama": "string",
-      "edad": "string",
-      "sexo": "string",
-      "fecha": "string",
-      "hora": "string",
-      "fechaIngreso": "string",
-      "medico": "string",
-      "familiarResponsable": "string",
-      "telefonoFamiliar": "string",
-      "subjetivo": "string",
-      "signos": {
-        "ta": "string",
-        "fc": "string",
-        "fr": "string",
-        "temp": "string",
-        "sat": "string",
-        "gluc": "string",
-        "peso": "string",
-        "talla": "string",
-        "imc": "string"
-      },
-      "g": {
-        "o": "string",
-        "v": "string",
-        "m": "string"
-      },
-      "pupilas": "string",
-      "exploracionFisica": "string",
-      "resultadosLaboratorio": "string",
-      "diagnosticosIngreso": ["string"],
-      "diagnosticosActivos": ["string"],
-      "analisis": "string",
-      "pronostico": "string",
-      "pendientes": "string",
-      "plan": "string"
-    }
-
-    REGLAS DE EXTRACCIÓN:
-    1. Extrae los signos vitales exactamente como aparecen.
-    2. En 'Subjetivo', resume lo que refiere el paciente.
-    3. En 'Diagnósticos', separa por items en el array.
-    4. Para la escala de Glasgow (g), extrae solo el número como texto (ej: "4") para o, v, m. Si solo tienes el total, intenta estimar o pon "0".
+    IMPORTANTE: 
+    1. Si un dato no está presente, devuelve una cadena vacía "".
+    2. Si encuentras datos numéricos (como Glasgow), devuélvelos como texto (ej: "4").
+    3. Si el texto tiene etiquetas como [DATOS_GENERALES], [SUBJETIVO], úsalas para guiarte.
     
     Texto a analizar: "${textInput}"`;
 
@@ -336,8 +349,8 @@ export const AiService = {
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-          responseMimeType: "application/json"
-          // Sin responseSchema para evitar errores de validación en datos incompletos
+          responseMimeType: "application/json",
+          responseSchema: schema
         }
       });
       
