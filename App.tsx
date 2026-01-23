@@ -3,7 +3,7 @@ import {
   Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
   Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
-  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy, RotateCcw
+  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy, RotateCcw, FileDown
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
@@ -249,70 +249,59 @@ export default function App() {
               showToast('No se pudieron interpretar los datos. Intenta mejorar el formato.');
             }
         } else {
-            // LÓGICA ROBUSTA PARA EVOLUCIÓN
+            // LÓGICA ROBUSTA Y EFICIENTE PARA EVOLUCIÓN
             const parsedData = await AiService.parseEvolutionData(importText);
 
             if (parsedData) {
                 setEvoForm(prev => {
-                    // Helper: Solo actualiza si el nuevo valor tiene contenido real
-                    const mergeField = (newVal: any, oldVal: any) => 
-                        (newVal !== undefined && newVal !== "" && newVal !== null) ? newVal : oldVal;
+                    // Copia inmutable del estado
+                    const next = { ...prev };
+                    const incoming = parsedData as Partial<EvolutionForm>;
 
-                    // Merge inteligente para Signos (preserva los que ya existan)
-                    const newSignos = { ...prev.signos };
-                    if (parsedData.signos) {
-                        Object.keys(newSignos).forEach(key => {
-                            const k = key as keyof typeof newSignos;
-                            if (parsedData.signos && parsedData.signos[k]) {
-                                newSignos[k] = String(parsedData.signos[k]);
+                    // Helper para validar datos (no nulos/vacíos)
+                    const isValid = (v: any) => v !== undefined && v !== null && v !== '';
+
+                    // 1. Iteración dinámica para campos primitivos (strings)
+                    // Excluimos las claves complejas que manejaremos manualmente
+                    const complexKeys = ['signos', 'g', 'diagnosticosIngreso', 'diagnosticosActivos'];
+                    
+                    Object.keys(incoming).forEach(key => {
+                        const k = key as keyof EvolutionForm;
+                        // Si no es complejo y tiene valor válido, actualizamos
+                        if (!complexKeys.includes(k) && isValid(incoming[k])) {
+                             // @ts-ignore: Asignación segura dinámica
+                            next[k] = incoming[k];
+                        }
+                    });
+
+                    // 2. Merge profundo eficiente para Objetos (Signos)
+                    if (incoming.signos) {
+                        next.signos = { ...prev.signos }; // Copia superficial de signos previos
+                        Object.keys(incoming.signos).forEach(sk => {
+                            const key = sk as keyof typeof incoming.signos;
+                            if (isValid(incoming.signos![key])) {
+                                next.signos[key] = String(incoming.signos![key]);
                             }
                         });
                     }
 
-                    // Merge inteligente para Glasgow
-                    const newG = { ...prev.g };
-                    if (parsedData.g) {
-                        if (parsedData.g.o) newG.o = parsedData.g.o;
-                        if (parsedData.g.v) newG.v = parsedData.g.v;
-                        if (parsedData.g.m) newG.m = parsedData.g.m;
+                    // 3. Merge profundo eficiente para Objetos (Glasgow)
+                    if (incoming.g) {
+                        next.g = { ...prev.g };
+                        if (isValid(incoming.g.o)) next.g.o = incoming.g.o;
+                        if (isValid(incoming.g.v)) next.g.v = incoming.g.v;
+                        if (isValid(incoming.g.m)) next.g.m = incoming.g.m;
                     }
 
-                    return {
-                        ...prev,
-                        // Campos directos con mergeField
-                        folio: mergeField(parsedData.folio, prev.folio),
-                        cama: mergeField(parsedData.cama, prev.cama),
-                        nombre: mergeField(parsedData.nombre, prev.nombre),
-                        edad: mergeField(parsedData.edad, prev.edad),
-                        sexo: mergeField(parsedData.sexo, prev.sexo),
-                        fecha: mergeField(parsedData.fecha, prev.fecha),
-                        hora: mergeField(parsedData.hora, prev.hora),
-                        fechaIngreso: mergeField(parsedData.fechaIngreso, prev.fechaIngreso),
-                        medico: mergeField(parsedData.medico, prev.medico),
-                        familiarResponsable: mergeField(parsedData.familiarResponsable, prev.familiarResponsable),
-                        telefonoFamiliar: mergeField(parsedData.telefonoFamiliar, prev.telefonoFamiliar),
-                        
-                        subjetivo: mergeField(parsedData.subjetivo, prev.subjetivo),
-                        exploracionFisica: mergeField(parsedData.exploracionFisica, prev.exploracionFisica),
-                        resultadosLaboratorio: mergeField(parsedData.resultadosLaboratorio, prev.resultadosLaboratorio),
-                        analisis: mergeField(parsedData.analisis, prev.analisis),
-                        pronostico: mergeField(parsedData.pronostico, prev.pronostico),
-                        pendientes: mergeField(parsedData.pendientes, prev.pendientes),
-                        plan: mergeField(parsedData.plan, prev.plan),
-                        pupilas: mergeField(parsedData.pupilas, prev.pupilas),
+                    // 4. Actualización de Arrays (Solo si hay nuevos datos)
+                    if (Array.isArray(incoming.diagnosticosIngreso) && incoming.diagnosticosIngreso.length > 0) {
+                        next.diagnosticosIngreso = incoming.diagnosticosIngreso;
+                    }
+                    if (Array.isArray(incoming.diagnosticosActivos) && incoming.diagnosticosActivos.length > 0) {
+                        next.diagnosticosActivos = incoming.diagnosticosActivos;
+                    }
 
-                        // Objetos protegidos
-                        signos: newSignos,
-                        g: newG,
-
-                        // Arrays: Validación y merge
-                        diagnosticosIngreso: (Array.isArray(parsedData.diagnosticosIngreso) && parsedData.diagnosticosIngreso.length > 0) 
-                            ? parsedData.diagnosticosIngreso 
-                            : prev.diagnosticosIngreso,
-                        diagnosticosActivos: (Array.isArray(parsedData.diagnosticosActivos) && parsedData.diagnosticosActivos.length > 0) 
-                            ? parsedData.diagnosticosActivos 
-                            : prev.diagnosticosActivos,
-                    };
+                    return next;
                 });
                 
                 setImportText('');
@@ -651,6 +640,53 @@ export default function App() {
     }
     saveToHistory();
     showToast('Nota descargada correctamente');
+  };
+  
+  const handleDownloadPDF = async () => {
+    const isAdmission = appMode === 'admission';
+    if (isAdmission) {
+        if (!form.nombre.trim()) return showToast('Falta el nombre del paciente');
+        if (!form.sintomaPrincipal.trim()) return showToast('Falta el síntoma principal');
+    } else {
+        if (!evoForm.nombre.trim()) return showToast('Falta el nombre del paciente');
+    }
+
+    showToast('Generando PDF...');
+
+    const htmlContent = isAdmission ? generateDocHTML(form) : generateEvolutionDocHTML(evoForm);
+    const fileName = isAdmission 
+        ? `Nota_Ingreso_${form.nombre.replace(/\s+/g, '_')}` 
+        : `Nota_Evolucion_${evoForm.nombre.replace(/\s+/g, '_')}`;
+
+    // Create a temporary container for PDF generation
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+    // Apply basic styles for PDF look
+    element.style.width = '800px'; 
+    element.style.background = 'white';
+    element.style.color = 'black';
+    element.style.padding = '20px';
+
+    const opt = {
+        margin: [10, 10, 10, 10], // top, left, bottom, right in mm
+        filename: `${fileName}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if ((window as any).html2pdf) {
+        try {
+            await (window as any).html2pdf().set(opt).from(element).save();
+            showToast("PDF descargado correctamente");
+            saveToHistory();
+        } catch (error) {
+            console.error(error);
+            showToast("Error al generar PDF");
+        }
+    } else {
+        showToast("Error: Librería PDF no cargada");
+    }
   };
 
   // --- NUEVO: Generador de Texto Estructurado para Admisión ---
@@ -1234,17 +1270,24 @@ ${data.plan}`;
                 <div className="flex gap-4">
                     <button 
                         onClick={handleReset} 
-                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 text-rose-500 border-rose-100 hover:border-rose-200 dark:border-slate-700 shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 text-slate-400 border-slate-200 hover:border-slate-300 dark:border-slate-700 shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
                         title="Nueva Nota (Limpiar)"
                     >
                         <RotateCcw size={24} strokeWidth={2.5} />
                     </button>
                     <button 
-                    onClick={downloadWord} 
-                    className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 ${appMode==='admission'?'text-emerald-600 border-emerald-100':'text-indigo-600 border-indigo-100'} hover:border-current shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
-                    title="Descargar documento Word"
+                        onClick={downloadWord} 
+                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 ${appMode==='admission'?'text-emerald-600 border-emerald-100':'text-indigo-600 border-indigo-100'} hover:border-current shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                        title="Descargar Word"
                     >
-                    <Download size={24} strokeWidth={2.5} />
+                        <FileText size={24} strokeWidth={2.5} />
+                    </button>
+                    <button 
+                        onClick={handleDownloadPDF} 
+                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 text-rose-500 border-rose-100 hover:border-rose-300 dark:border-rose-900 shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                        title="Descargar PDF"
+                    >
+                        <FileDown size={24} strokeWidth={2.5} />
                     </button>
                     <button 
                     onClick={handleWhatsApp} 

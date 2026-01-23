@@ -270,12 +270,12 @@ export const AiService = {
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Implementación idéntica a parseData (Ingreso) usando Schema
+    // Schema con descripciones mejoradas para guiar el mapeo de texto no estructurado
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
         // Datos Generales
-        folio: { type: Type.STRING },
+        folio: { type: Type.STRING, description: "Número de expediente o folio" },
         nombre: { type: Type.STRING },
         cama: { type: Type.STRING },
         edad: { type: Type.STRING },
@@ -292,7 +292,10 @@ export const AiService = {
         telefonoFamiliar: { type: Type.STRING },
         
         // Subjetivo
-        subjetivo: { type: Type.STRING },
+        subjetivo: { 
+          type: Type.STRING, 
+          description: "Resumen de lo que refiere el paciente o familiar. Incluir sintomatología actual, mejoría o empeoramiento." 
+        },
         
         // Objetos Anidados (Signos y Glasgow)
         signos: {
@@ -320,28 +323,53 @@ export const AiService = {
         pupilas: { type: Type.STRING },
         
         // Objetivo Restante
-        exploracionFisica: { type: Type.STRING },
-        resultadosLaboratorio: { type: Type.STRING },
+        exploracionFisica: { 
+          type: Type.STRING, 
+          description: "Hallazgos objetivos a la exploración física (tórax, abdomen, extremidades, etc.)." 
+        },
+        resultadosLaboratorio: { 
+          type: Type.STRING, 
+          description: "Resultados relevantes de laboratorios (Hb, Leuc, Plaq, QS, ES) o gabinete (Rx, TAC)." 
+        },
         
         // Análisis y Arrays
         diagnosticosIngreso: { type: Type.ARRAY, items: { type: Type.STRING } },
         diagnosticosActivos: { type: Type.ARRAY, items: { type: Type.STRING } },
-        analisis: { type: Type.STRING },
+        analisis: { 
+          type: Type.STRING, 
+          description: "Integración clínica, evolución, pronóstico y justificación del manejo." 
+        },
         pronostico: { type: Type.STRING },
         pendientes: { type: Type.STRING },
         
         // Plan
-        plan: { type: Type.STRING }
+        plan: { 
+          type: Type.STRING, 
+          description: "Plan de manejo detallado: Dieta, Soluciones, Medicamentos, Cuidados, etc." 
+        }
       }
     };
 
-    const prompt = `Analiza el siguiente texto y extrae TODA la información posible para llenar la Nota de Evolución (SOAP).
+    const prompt = `Actúa como un asistente médico experto en estructurar información clínica.
+    Analiza el siguiente texto de entrada, que puede ser informal, desordenado o un reporte de guardia, y extrae la información para llenar la Nota de Evolución (SOAP).
     
-    IMPORTANTE: 
-    1. Si un dato no está presente, devuelve una cadena vacía "".
-    2. Si encuentras datos numéricos (como Glasgow), devuélvelos como texto (ej: "4").
-    3. Si el texto tiene etiquetas como [DATOS_GENERALES], [SUBJETIVO], úsalas para guiarte.
+    ESTRATEGIA DE MAPEO INTELIGENTE:
+    1. **Texto Libre -> Campos Específicos**:
+       - Si dice "paciente refiere..." o menciona síntomas -> Asignar a 'subjetivo'.
+       - Si menciona signos vitales (TA, FC, Temp) -> Asignar a 'signos'.
+       - Si describe hallazgos físicos (campos pulmonares, abdomen) -> Asignar a 'exploracionFisica'.
+       - Si menciona laboratorios -> Asignar a 'resultadosLaboratorio'.
+       - Si hay conclusiones, diagnósticos o "se decide..." -> Asignar a 'analisis' o 'diagnosticosActivos'.
+       - Si lista medicamentos o indicaciones -> Asignar a 'plan'.
     
+    2. **Manejo de Datos Faltantes**:
+       - Si un dato NO se encuentra explícitamente en el texto, devuelve una cadena vacía "".
+       - NO inventes información.
+    
+    3. **Formato**:
+       - Devuelve ÚNICAMENTE el objeto JSON conforme al esquema.
+       - Normaliza valores numéricos a texto (ej. Glasgow "15").
+
     Texto a analizar: "${textInput}"`;
 
     try {
