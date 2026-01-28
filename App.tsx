@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Moon, Sun, Download, Trash2, CheckCircle, ChevronLeft, ChevronRight, 
   Check, Sparkles, Loader2, AlertTriangle, Plus, X, 
-  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Wand2, Eye,
-  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy, RotateCcw, FileDown
+  Archive, FileUp, User, Stethoscope, HeartPulse, History, ClipboardPlus, Share2, QrCode, Eye,
+  AlertOctagon, BookOpen, Activity, FileText, ArrowRight, UserCheck, Edit3, Coffee, Droplets, Copy, RotateCcw, FileDown, FileJson
 } from 'lucide-react';
 
 import { AuroraStyles } from './components/AuroraStyles';
@@ -12,6 +12,7 @@ import { AiService } from './services/aiService';
 import { StorageService } from './services/storageService';
 import { INITIAL_FORM, INITIAL_EVOLUTION_FORM, SIGNOS_ORDER, SIGNOS_LABELS, SIGNOS_UNITS, MONTHS, SEMIOLOGIA_TAGS, EXPLORACION_PLANTILLAS, ANTECEDENTES_OPTS, SUGERENCIAS_DX, DX_PRESETS, PRONOSTICO_OPTS, PENDIENTES_OPTS, STEPS_CONFIG, EVOLUTION_STEPS } from './constants';
 import { PatientForm, EvolutionForm, AiAnalysisResult, NoteEntry, AiEvolutionResult } from './types';
+import { SignaturePad } from './components/SignaturePad';
 
 const StepHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType, title: string, subtitle: string }) => (
   <div className="flex items-center gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -40,7 +41,8 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [showQr, setShowQr] = useState(false);
+  const [showQr, setShowQr] = useState(false); // QR for App sharing
+  const [showNoteQr, setShowNoteQr] = useState(false); // QR for Patient Note
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<AiAnalysisResult | AiEvolutionResult | null>(null);
@@ -48,12 +50,12 @@ export default function App() {
   const [glasgowTotal, setGlasgowTotal] = useState(15);
   const [dob, setDob] = useState({ d: '', m: '', y: '' });
   
-  const [importText, setImportText] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  
   const [customAntecedente, setCustomAntecedente] = useState('');
   const [customDx, setCustomDx] = useState('');
   
+  // Estado para el texto de importación JSON
+  const [jsonInput, setJsonInput] = useState('');
+
   // Estado local para el diagnóstico de ingreso en evolución
   const [customIngresoDx, setCustomIngresoDx] = useState('');
 
@@ -91,7 +93,7 @@ export default function App() {
     }
     const savedEvoDraft = StorageService.loadEvolutionDraft();
     if (savedEvoDraft) {
-        setEvoForm(prev => ({...prev, ...savedEvoDraft})); // Merge para conservar fecha actual si se desea, o sobrescribir todo
+        setEvoForm(prev => ({...prev, ...savedEvoDraft})); 
         msg = savedDraft ? 'Borradores restaurados' : 'Borrador de evolución restaurado';
     }
     
@@ -162,8 +164,7 @@ export default function App() {
   const calculateStayDuration = () => {
     if (!evoForm.fechaIngreso) return "Pendiente";
     const start = new Date(evoForm.fechaIngreso);
-    const end = new Date(); // Usar fecha actual para el cálculo
-    // Ajustar fechas para ignorar diferencias horarias si es solo por fecha
+    const end = new Date();
     const diff = end.getTime() - start.getTime();
     if (isNaN(diff)) return "Fecha inválida";
     
@@ -203,6 +204,25 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleJsonImport = () => {
+    if (!jsonInput.trim()) return showToast('Pega el texto JSON primero');
+    try {
+        const parsedData = JSON.parse(jsonInput);
+        
+        if (appMode === 'admission') {
+            setForm(prev => ({ ...prev, ...parsedData }));
+        } else {
+            setEvoForm(prev => ({ ...prev, ...parsedData }));
+        }
+        
+        setJsonInput('');
+        showToast('✅ Datos importados correctamente');
+        saveToHistory();
+    } catch (error) {
+        showToast('❌ Error: El formato JSON no es válido');
+    }
+  };
+
   const handleSystemAnalysis = async (data = form) => {
     setIsProcessing(true);
     if (appMode === 'admission') {
@@ -226,118 +246,6 @@ export default function App() {
     }
   };
 
-  const handleSmartFill = async () => {
-    if (!importText.trim()) return showToast('Pega un texto primero');
-    setIsImporting(true);
-
-    try {
-        if (appMode === 'admission') {
-            // 1. Parsear datos crudos
-            const parsedData = await AiService.parseData(importText);
-            
-            if (parsedData) {
-              // 2. Crear objeto fusionado
-              const newForm = {
-                ...form,
-                ...parsedData,
-                signos: { ...form.signos, ...(parsedData.signos || {}) },
-                g: { ...form.g, ...(parsedData.g || {}) }
-              };
-
-              // 3. Actualizar estado visual
-              setForm(newForm);
-              setImportText('');
-              
-              // 4. GENERACIÓN AUTOMÁTICA (Auto-Analyze)
-              showToast('Datos integrados. Generando redacción médica...');
-              
-              // Usamos newForm directamente para no esperar al estado
-              const result = await AiService.analyze(newForm);
-              
-              if (result) {
-                  setProcessingResult(result);
-                  showToast('Nota generada y lista para revisión');
-              } else {
-                  showToast('Datos llenados. Haz clic en la estrella para analizar.');
-              }
-
-            } else {
-              showToast('No se pudieron interpretar los datos.');
-            }
-        } else {
-            // LÓGICA EVOLUCIÓN
-            const parsedData = await AiService.parseEvolutionData(importText);
-
-            if (parsedData) {
-                // Preparar el nuevo estado basado en el actual (prev -> evoForm)
-                const next = { ...evoForm }; 
-                const incoming = parsedData as Partial<EvolutionForm>;
-                const isValid = (v: any) => v !== undefined && v !== null && v !== '';
-                const complexKeys = ['signos', 'g', 'diagnosticosIngreso', 'diagnosticosActivos'];
-                
-                // Merge primitivos
-                Object.keys(incoming).forEach(key => {
-                    const k = key as keyof EvolutionForm;
-                    if (!complexKeys.includes(k) && isValid(incoming[k])) {
-                         // @ts-ignore
-                        next[k] = incoming[k];
-                    }
-                });
-
-                // Merge Signos
-                if (incoming.signos) {
-                    next.signos = { ...evoForm.signos }; 
-                    Object.keys(incoming.signos).forEach(sk => {
-                        const key = sk as keyof typeof incoming.signos;
-                        if (isValid(incoming.signos![key])) {
-                            next.signos[key] = String(incoming.signos![key]);
-                        }
-                    });
-                }
-
-                // Merge Glasgow
-                if (incoming.g) {
-                    next.g = { ...evoForm.g };
-                    if (isValid(incoming.g.o)) next.g.o = incoming.g.o;
-                    if (isValid(incoming.g.v)) next.g.v = incoming.g.v;
-                    if (isValid(incoming.g.m)) next.g.m = incoming.g.m;
-                }
-
-                // Merge Arrays
-                if (Array.isArray(incoming.diagnosticosIngreso) && incoming.diagnosticosIngreso.length > 0) {
-                    next.diagnosticosIngreso = incoming.diagnosticosIngreso;
-                }
-                if (Array.isArray(incoming.diagnosticosActivos) && incoming.diagnosticosActivos.length > 0) {
-                    next.diagnosticosActivos = incoming.diagnosticosActivos;
-                }
-                
-                // Actualizar UI
-                setEvoForm(next);
-                setImportText('');
-
-                // GENERACIÓN AUTOMÁTICA
-                showToast('Datos integrados. Generando análisis y plan...');
-                const result = await AiService.analyzeEvolution(next);
-
-                if (result) {
-                    setProcessingResult(result); // Abre el modal automáticamente
-                    showToast('Nota de Evolución generada');
-                } else {
-                    showToast('Datos llenados. Haz clic en la estrella para analizar.');
-                }
-
-            } else {
-                showToast('No se encontraron datos estructurados.');
-            }
-        }
-    } catch (error) {
-        console.error("Error en autocompletado:", error);
-        showToast('Ocurrió un error al procesar el texto.');
-    } finally {
-        setIsImporting(false);
-    }
-  };
-
   const applySystemSuggestions = () => {
     if (!processingResult) return;
     
@@ -355,12 +263,10 @@ export default function App() {
           };
         });
         
-        // Guardar en historial automáticamente
         saveToHistory();
         showToast('Sugerencias aplicadas y guardadas en historial');
 
     } else {
-        // Modo Evolución
         const res = processingResult as AiEvolutionResult;
         setEvoForm(prev => {
             const newDiagnoses = res.diagnosticosSugeridos.map(d => `${d.codigo} - ${d.nombre}`);
@@ -375,7 +281,6 @@ export default function App() {
             };
         });
 
-        // Guardar en historial automáticamente
         saveToHistory();
         showToast('Evolución actualizada y guardada en historial');
     }
@@ -398,7 +303,6 @@ export default function App() {
             showToast('Diagnóstico agregado');
         }
     } else {
-        // En evolución, agrega a "Diagnósticos Activos" (antes Actuales)
         if(dx && !evoForm.diagnosticosActivos.includes(dx)) {
             updateEvoForm('diagnosticosActivos', [...evoForm.diagnosticosActivos, dx]);
             setCustomDx('');
@@ -441,7 +345,6 @@ export default function App() {
 
   const handleReset = () => {
     if (window.confirm('¿Deseas reiniciar y limpiar todos los campos para una nueva nota?')) {
-        // Helper para copia profunda
         const deepCopy = (obj: any) => JSON.parse(JSON.stringify(obj));
 
         if (appMode === 'admission') {
@@ -461,18 +364,16 @@ export default function App() {
         }
         setStep(1);
         
-        // Limpiar estados auxiliares
         setCustomDx('');
         setCustomAntecedente('');
         setCustomIngresoDx('');
-        setImportText('');
         setProcessingResult(null);
+        setJsonInput('');
         
         showToast('Formulario reiniciado');
     }
   };
 
-  // --- Generador HTML Nota Ingreso ---
   const generateDocHTML = (data: PatientForm) => {
     const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
     const dateStr = new Date().toLocaleDateString();
@@ -524,7 +425,6 @@ export default function App() {
     `;
   };
 
-  // --- Generador HTML Nota Evolución ---
   const generateEvolutionDocHTML = (data: EvolutionForm) => {
     const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
     const renderSignos = () => {
@@ -535,7 +435,6 @@ export default function App() {
         return html;
     };
     
-    // Calcular estancia para el reporte impreso
     const estanciaCalculada = data.fechaIngreso ? (() => {
         const start = new Date(data.fechaIngreso);
         const end = new Date();
@@ -578,13 +477,11 @@ export default function App() {
             </tr>
         </table>
 
-        <!-- SUBJETIVO -->
         <div style="margin-bottom: 15px;">
             <div style="background: #eee; padding: 4px 8px; font-weight: bold; font-size: 14px; border-left: 4px solid #333;">S - SUBJETIVO</div>
             <p style="margin: 5px 0; text-align: justify; font-size: 13px;">${data.subjetivo || 'Sin datos subjetivos relevantes.'}</p>
         </div>
 
-        <!-- OBJETIVO -->
         <div style="margin-bottom: 15px;">
             <div style="background: #eee; padding: 4px 8px; font-weight: bold; font-size: 14px; border-left: 4px solid #333;">O - OBJETIVO</div>
             <div style="font-size: 12px; margin: 5px 0; background: #f9f9f9; padding: 5px; border: 1px solid #ddd;">
@@ -594,7 +491,6 @@ export default function App() {
             ${data.resultadosLaboratorio ? `<p style="margin: 5px 0; font-size: 13px;"><b>Labs/Gabinete:</b> ${data.resultadosLaboratorio}</p>` : ''}
         </div>
 
-        <!-- ANALISIS -->
         <div style="margin-bottom: 15px;">
             <div style="background: #eee; padding: 4px 8px; font-weight: bold; font-size: 14px; border-left: 4px solid #333;">A - ANÁLISIS</div>
             
@@ -614,7 +510,6 @@ export default function App() {
             ${data.pendientes ? `<p style="margin: 5px 0; font-size: 13px;"><b>Pendientes:</b> ${data.pendientes}</p>` : ''}
         </div>
 
-        <!-- PLAN -->
         <div style="margin-bottom: 25px;">
             <div style="background: #eee; padding: 4px 8px; font-weight: bold; font-size: 14px; border-left: 4px solid #333;">P - PLAN</div>
             <div style="font-size: 13px;">
@@ -678,17 +573,15 @@ export default function App() {
         ? `Nota_Ingreso_${form.nombre.replace(/\s+/g, '_')}` 
         : `Nota_Evolucion_${evoForm.nombre.replace(/\s+/g, '_')}`;
 
-    // Create a temporary container for PDF generation
     const element = document.createElement('div');
     element.innerHTML = htmlContent;
-    // Apply basic styles for PDF look
     element.style.width = '800px'; 
     element.style.background = 'white';
     element.style.color = 'black';
     element.style.padding = '20px';
 
     const opt = {
-        margin: [10, 10, 10, 10], // top, left, bottom, right in mm
+        margin: [10, 10, 10, 10], 
         filename: `${fileName}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
@@ -709,80 +602,8 @@ export default function App() {
     }
   };
 
-  // --- NUEVO: Generador de Texto Estructurado para Admisión ---
-  const generateStructuredAdmissionText = (data: PatientForm) => {
-    const glasgow = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
-    return `**NOTA DE INGRESO**
-Folio: ${data.folio}
-Paciente: ${data.nombre} (${data.edad}, ${data.sexo})
-Fecha Nac: ${data.fn}
-E. Civil: ${data.estadoCivil} | Escolaridad: ${data.escolaridad}
-Ocupación: ${data.ocupacion}
-Domicilio: ${data.domicilio}
-Responsable: ${data.responsable} (Tel: ${data.telefono})
-Medico Tratante: ${data.medicoTratante} (${data.cedulaProfesional})
-
-[MOTIVO]
-Sintoma Principal: ${data.sintomaPrincipal}
-T. Evolución: ${data.tiempoEvolucion}
-Padecimiento: ${data.padecimientoActual}
-
-[SIGNOS VITALES]
-TA:${data.signos.ta} FC:${data.signos.fc} FR:${data.signos.fr} Temp:${data.signos.temp} Sat:${data.signos.sat}
-Peso:${data.signos.peso} Talla:${data.signos.talla} Glucosa:${data.signos.gluc}
-Glasgow: ${glasgow} (${data.g.o}O, ${data.g.v}V, ${data.g.m}M) Pupilas: ${data.pupilas}
-
-[ANTECEDENTES]
-Patológicos: ${data.antecedentes.join(', ')}
-Alergias: ${data.alergias}
-Tabaquismo: ${data.tabaquismo} Alcohol: ${data.alcohol}
-
-[EXPLORACION]
-${data.exploracion}
-
-[DIAGNOSTICO]
-${data.diagnostico.join('\n')}
-Pronóstico: ${data.pronostico}
-
-[PLAN]
-${data.plan}`;
-  };
-
-  // --- NUEVO: Generador de Texto Estructurado para Evolución ---
-  const generateStructuredEvolutionText = (data: EvolutionForm) => {
-    const glasgowTotal = (parseInt(String(data.g?.o))||0) + (parseInt(String(data.g?.v))||0) + (parseInt(String(data.g?.m))||0);
-    return `*** NOTA DE EVOLUCIÓN (FORMATO INTERCAMBIO) ***
-[DATOS_GENERALES]
-Nombre: ${data.nombre} | Edad: ${data.edad} | Sexo: ${data.sexo}
-Folio: ${data.folio} | Cama: ${data.cama}
-Fecha Nota: ${data.fecha} | Hora: ${data.hora}
-Fecha Ingreso: ${data.fechaIngreso}
-Escolaridad: ${data.escolaridad} | Ocupación: ${data.ocupacion}
-Médico: ${data.medico}
-Familiar: ${data.familiarResponsable} (Tel: ${data.telefonoFamiliar})
-
-[SUBJETIVO]
-${data.subjetivo}
-
-[OBJETIVO]
-Signos Vitales: TA:${data.signos.ta} | FC:${data.signos.fc} | FR:${data.signos.fr} | Temp:${data.signos.temp} | SatO2:${data.signos.sat} | Gluc:${data.signos.gluc} | Peso:${data.signos.peso} | Talla:${data.signos.talla}
-Neurológico: Glasgow ${glasgowTotal} (O${data.g.o} V${data.g.v} M${data.g.m}) | Pupilas: ${data.pupilas}
-Exploración Física: ${data.exploracionFisica}
-Laboratorios/Gabinete: ${data.resultadosLaboratorio}
-
-[ANALISIS]
-Diagnósticos Ingreso: ${data.diagnosticosIngreso.join('; ')}
-Diagnósticos Activos: ${data.diagnosticosActivos.join('; ')}
-Análisis Clínico: ${data.analisis}
-Pronóstico: ${data.pronostico}
-Pendientes: ${data.pendientes}
-
-[PLAN]
-${data.plan}`;
-  };
-
   const handleWhatsApp = () => {
-    let text = '';
+    let jsonContent = '';
     const name = appMode === 'admission' ? form.nombre : evoForm.nombre;
     
     if (!name.trim()) return showToast('Falta el nombre del paciente');
@@ -790,17 +611,24 @@ ${data.plan}`;
     if (appMode === 'admission') {
         if (!form.sintomaPrincipal.trim()) return showToast('Falta el síntoma principal');
         if (!form.padecimientoActual.trim()) return showToast('Falta el padecimiento actual');
-        text = generateStructuredAdmissionText(form);
+        const { firmaDataURL, ...cleanForm } = form;
+        jsonContent = JSON.stringify(cleanForm);
     } else {
-        text = generateStructuredEvolutionText(evoForm);
+        jsonContent = JSON.stringify(evoForm);
     }
 
     saveToHistory(); 
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(jsonContent)}`;
     window.open(url, '_blank');
-    showToast('Abriendo WhatsApp...');
+    showToast('Generando JSON para WhatsApp...');
   };
   
+  const handleNoteQr = () => {
+      const name = appMode === 'admission' ? form.nombre : evoForm.nombre;
+      if (!name.trim()) return showToast('Falta el nombre del paciente');
+      setShowNoteQr(true);
+  };
+
   const handleNext = () => {
     if (appMode === 'admission') {
         if (step === 1 && !form.nombre.trim()) return showToast('Falta el nombre del paciente');
@@ -809,16 +637,14 @@ ${data.plan}`;
             if (!form.padecimientoActual.trim()) return showToast('Falta el padecimiento actual');
         }
     } else if (appMode === 'evolution') {
-        // En evolución el paso 1 tiene el nombre
         if (step === 1 && !evoForm.nombre.trim()) return showToast('Falta el nombre del paciente');
     }
     
     setStep(step + 1);
   };
 
-  // --- Renderizado de Pasos de Admisión (Existente) ---
   const renderAdmissionStep = () => {
-    switch(step) {
+     switch(step) {
       case 1:
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -903,7 +729,6 @@ ${data.plan}`;
                 </div>
               ))}
             </div>
-            {/* Glasgow Logic for Admission */}
             <div className="bg-slate-100 dark:bg-[#1e293b] p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-sm">
                 <h4 className="text-sm font-bold mb-4 text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600 pb-2">Escala de Glasgow</h4>
                 <div className="flex gap-4">
@@ -938,8 +763,44 @@ ${data.plan}`;
             <div><Label>Diagnósticos</Label><div className="min-h-[50px] p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-3 flex flex-col gap-2 border-2 border-slate-200 dark:border-slate-700">{form.diagnostico.length === 0 ? (<span className="text-slate-400 dark:text-slate-500 text-sm italic py-2 px-1">Vacío</span>) : (<div className="flex flex-wrap gap-2">{form.diagnostico.map(dx => (<div key={dx} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-sm shadow-sm"><span>{dx}</span><button onClick={() => removeDx(dx)} className="text-slate-400 hover:text-red-500 dark:hover:text-red-400"><X size={14}/></button></div>))}</div>)}</div><div className="flex gap-2 mb-4"><div className="relative flex-1"><Input value={customDx} onChange={e => setCustomDx(e.target.value)} placeholder="[CIE-10] Diagnóstico" onKeyDown={e => e.key==='Enter' && addDx(customDx)} className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200"/></div><button onClick={() => addDx(customDx)} className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl w-14 flex items-center justify-center shadow-lg"><Plus size={24}/></button></div><div className="grid grid-cols-4 gap-2">{DX_PRESETS.map(preset => (<button key={preset.code} onClick={() => addDx(`${preset.code} - ${preset.label}`)} className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"><Plus size={10}/> {preset.code}</button>))}</div></div>
             <div><Label>Pronóstico</Label><div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border-2 border-slate-200 dark:border-slate-800">{PRONOSTICO_OPTS.map(opt => (<button key={opt} onClick={() => updateForm('pronostico', opt)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${form.pronostico === opt ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400'}`}>{opt}</button>))}</div></div>
             <div><Label>Plan de Tratamiento</Label><TextArea rows={8} value={form.plan} onChange={e => updateForm('plan', e.target.value)} placeholder="1. Dieta... 2. Soluciones..." className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 font-mono text-sm"/></div>
-            {/* Smart Fill for Admission (original) */}
-            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-sm mt-4"><h4 className="text-emerald-600 dark:text-emerald-400 font-bold mb-2 flex items-center gap-2"><Wand2 size={18}/> Autocompletar</h4><TextArea rows={4} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Texto libre..." className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-300 text-sm shadow-sm"/><button onClick={handleSmartFill} disabled={isImporting} className="w-full bg-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 mt-4 transition-all shadow-md">{isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Rellenar</button></div>
+            
+             <div>
+                   <Label>Firma del Médico</Label>
+                   <SignaturePad initialData={form.firmaDataURL} onSave={(data) => setForm(prev => ({...prev, firmaDataURL: data}))} />
+            </div>
+
+            <div className="pt-2">
+                <button 
+                    onClick={() => handleSystemAnalysis()} 
+                    disabled={isProcessing}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-95"
+                >
+                    {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} className="text-yellow-200" />}
+                    Revisar Nota con IA
+                </button>
+                <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-2">
+                    Analiza la congruencia clínica y recibe sugerencias de mejora antes de descargar.
+                </p>
+            </div>
+
+            <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-6 mt-6">
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                    <Label>Importar Datos (WhatsApp / JSON)</Label>
+                    <TextArea 
+                        rows={3} 
+                        value={jsonInput} 
+                        onChange={e => setJsonInput(e.target.value)} 
+                        placeholder='Pega aquí el código JSON compartido...' 
+                        className="mb-3 text-xs font-mono"
+                    />
+                    <button 
+                        onClick={handleJsonImport}
+                        className="w-full py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        <FileJson size={18}/> Cargar Datos
+                    </button>
+                </div>
+            </div>
           </div>
         );
       default: return null;
@@ -953,8 +814,6 @@ ${data.plan}`;
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             <StepHeader icon={User} title="Datos Generales" subtitle="Identificación del paciente y tiempos de la nota." />
             
-            {/* Removed redundant Smart Fill Section from Step 1 */}
-
             <div className="grid grid-cols-2 gap-4">
                 <div><Label>Folio / Expediente</Label><Input value={evoForm.folio} onChange={e => updateEvoForm('folio', e.target.value)} /></div>
                 <div><Label>Cama</Label><Input value={evoForm.cama} onChange={e => updateEvoForm('cama', e.target.value)} /></div>
@@ -1062,7 +921,6 @@ ${data.plan}`;
               ))}
             </div>
 
-             {/* Glasgow Logic for Evolution */}
             <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-sm">
                 <h4 className="text-sm font-bold mb-4 text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600 pb-2">Neurológico</h4>
                 <div className="flex gap-4">
@@ -1092,7 +950,6 @@ ${data.plan}`;
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <StepHeader icon={Activity} title="Análisis Clínico" subtitle="Interpretación de la evolución y diagnósticos." />
                 
-                {/* Diagnósticos de Ingreso */}
                 <div className="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                     <Label>Diagnósticos de Ingreso</Label>
                     <div className="flex flex-wrap gap-2 mb-2">
@@ -1109,7 +966,6 @@ ${data.plan}`;
                     </div>
                 </div>
 
-                {/* Diagnósticos Activos */}
                 <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-800">
                     <Label>Diagnósticos Activos</Label>
                     <div className="flex flex-wrap gap-2 mb-2">
@@ -1170,24 +1026,37 @@ ${data.plan}`;
                    <TextArea rows={12} value={evoForm.plan} onChange={e => updateEvoForm('plan', e.target.value)} placeholder="1. Dieta... 2. Soluciones... 3. Medicamentos..." className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 font-mono text-sm"/>
                 </div>
 
-                {/* Autocomplete Section for Evolution Note - Step 5 */}
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-2xl border-2 border-indigo-100 dark:border-indigo-800 shadow-sm mt-4">
-                  <h4 className="text-indigo-600 dark:text-indigo-400 font-bold mb-2 flex items-center gap-2"><Wand2 size={18}/> Autocompletar Formato</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pega un reporte o texto libre para llenar automáticamente todos los campos de la nota.</p>
-                  <TextArea 
-                    rows={4} 
-                    value={importText} 
-                    onChange={e => setImportText(e.target.value)} 
-                    placeholder="Pega aquí la información..." 
-                    className="bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-300 text-sm shadow-sm"
-                  />
-                  <button 
-                    onClick={handleSmartFill} 
-                    disabled={isImporting} 
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 mt-4 transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {isImporting ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Procesar e Integrar Información
-                  </button>
+                <div className="pt-2">
+                    <button 
+                        onClick={() => handleSystemAnalysis()} 
+                        disabled={isProcessing}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-95"
+                    >
+                        {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} className="text-yellow-200" />}
+                        Revisar Nota con IA
+                    </button>
+                    <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-2">
+                        Analiza la congruencia clínica y recibe sugerencias de mejora antes de descargar.
+                    </p>
+                </div>
+
+                <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-6 mt-6">
+                    <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <Label>Importar Datos (WhatsApp / JSON)</Label>
+                        <TextArea 
+                            rows={3} 
+                            value={jsonInput} 
+                            onChange={e => setJsonInput(e.target.value)} 
+                            placeholder='Pega aquí el código JSON compartido...' 
+                            className="mb-3 text-xs font-mono"
+                        />
+                        <button 
+                            onClick={handleJsonImport}
+                            className="w-full py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                        >
+                            <FileJson size={18}/> Cargar Datos
+                        </button>
+                    </div>
                 </div>
             </div>
           );
@@ -1219,7 +1088,6 @@ ${data.plan}`;
     <div className={`min-h-screen text-slate-800 dark:text-slate-200 pb-20 font-sans transition-all duration-500 ${getBackgroundClass()}`}>
       <AuroraStyles />
 
-      {/* NEW: Standalone Toggle for Selection Mode - Top Left */}
       {appMode === 'selection' && (
         <button 
             onClick={() => setDark(!dark)} 
@@ -1229,7 +1097,6 @@ ${data.plan}`;
         </button>
       )}
 
-      {/* EXISTING NAVBAR - Only show if NOT in selection mode */}
       {appMode !== 'selection' && (
         <div className={`sticky top-0 z-50 px-3 py-1.5 flex justify-between items-center shadow-lg border-b border-white/10 backdrop-blur-md transition-all duration-300 ${
             appMode === 'admission' 
@@ -1255,7 +1122,6 @@ ${data.plan}`;
         </div>
       )}
       
-      {/* Steps Bar - Only show if not in selection */}
       {appMode !== 'selection' && (
           <div className={`px-4 pt-6 pb-12 shadow-inner relative z-20 transition-colors duration-300 ${
               appMode === 'admission' 
@@ -1310,6 +1176,13 @@ ${data.plan}`;
                         <FileDown size={24} strokeWidth={2.5} />
                     </button>
                     <button 
+                        onClick={handleNoteQr} 
+                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 text-slate-600 border-slate-200 hover:border-slate-300 dark:border-slate-700 shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
+                        title="Generar QR de Nota"
+                    >
+                        <QrCode size={24} strokeWidth={2.5} />
+                    </button>
+                    <button 
                     onClick={handleWhatsApp} 
                     className={`w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-r ${appMode==='admission'?'from-emerald-500 to-emerald-600':'from-indigo-500 to-indigo-600'} text-white shadow-lg transition-all duration-300 hover:-translate-y-1 active:scale-95`}
                     title="Compartir por WhatsApp"
@@ -1323,7 +1196,6 @@ ${data.plan}`;
         </main>
       )}
 
-      {/* --- SELECTION SCREEN CONTENT --- */}
       {appMode === 'selection' && (
          <>
          <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -1332,7 +1204,6 @@ ${data.plan}`;
             <div className="stars-large"></div>
          </div>
          <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-60px)]">
-             {/* Header */}
             <div className="max-w-3xl text-center mb-16 animate-in fade-in slide-in-from-top-10 duration-700">
                 <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-6 cursor-pointer hover:scale-105 transition-transform" onClick={() => setShowDisclaimer(true)}>
                 <span className={`text-transparent bg-clip-text drop-shadow-sm ${dark ? 'bg-gradient-to-t from-sky-400 to-white' : 'bg-gradient-to-r from-teal-200 via-cyan-100 to-white'}`}>
@@ -1344,9 +1215,7 @@ ${data.plan}`;
                 </p>
             </div>
 
-            {/* Cards Grid */}
             <div className="max-w-5xl w-full grid md:grid-cols-2 gap-8 px-4">
-                {/* Card 1: Ingreso */}
                 <div 
                 onClick={() => { setAppMode('admission'); setStep(1); }}
                 className="group relative bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(52,211,153,0.3)] transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
@@ -1371,12 +1240,10 @@ ${data.plan}`;
                     </div>
                 </div>
 
-                {/* Card 2: Evolucion */}
                 <div 
                 onClick={() => { 
                     setAppMode('evolution'); 
                     setStep(1); 
-                    // Auto-update time when starting evolution note
                     const now = new Date();
                     setEvoForm(prev => ({
                         ...prev,
@@ -1412,7 +1279,6 @@ ${data.plan}`;
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce flex items-center gap-2 text-sm"><CheckCircle size={16} className="text-emerald-400"/> {toast}</div>}
       
-      {/* AI Modal Logic reused for both but could be customized */}
       {processingResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
            <div className="bg-[#0f172a] w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 animate-in zoom-in-95">
@@ -1422,10 +1288,8 @@ ${data.plan}`;
               </div>
               <div className="overflow-y-auto p-6 space-y-6 text-slate-300 custom-scrollbar">
                 
-                {/* Observaciones (General) */}
                 {processingResult.observaciones?.length > 0 && (<div className="border border-amber-900/50 bg-amber-950/20 rounded-xl overflow-hidden"><div className="bg-amber-900/30 px-4 py-2 border-b border-amber-900/50 flex items-center gap-2"><AlertOctagon size={16} className="text-amber-500"/><span className="font-bold text-amber-500 text-sm uppercase tracking-wide">Observaciones</span></div><ul className="p-4 space-y-2">{processingResult.observaciones.map((obs, i) => (<li key={i} className="flex gap-2 text-sm text-amber-100/80"><span className="text-amber-500 mt-1.5">•</span><span>{obs}</span></li>))}</ul></div>)}
                 
-                {/* Redacción Sugerida (Azul) */}
                 <div className="border border-blue-900/50 bg-blue-950/20 rounded-xl overflow-hidden">
                     <div className="bg-blue-900/30 px-4 py-2 border-b border-blue-900/50 flex items-center gap-2">
                         <BookOpen size={16} className="text-blue-400"/>
@@ -1438,10 +1302,8 @@ ${data.plan}`;
                     </div>
                 </div>
 
-                {/* Diagnósticos */}
                 <div><h4 className="text-indigo-400 text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2"><Activity size={16}/> Posibles Diagnósticos</h4><div className="space-y-3">{processingResult.diagnosticosSugeridos.map((dx, i) => (<div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-3"><div className="flex items-center gap-2 mb-1"><span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs font-bold font-mono">{dx.codigo}</span><span className="font-bold text-slate-200 text-sm">{dx.nombre}</span></div><p className="text-xs text-slate-400 pl-1">{dx.justificacion}</p></div>))}</div></div>
 
-                {/* Análisis Clínico (Solo Evolución) */}
                 {appMode === 'evolution' && (
                     <div className="border border-indigo-900/50 bg-indigo-950/20 rounded-xl overflow-hidden">
                         <div className="bg-indigo-900/30 px-4 py-2 border-b border-indigo-900/50 flex items-center gap-2">
@@ -1454,7 +1316,6 @@ ${data.plan}`;
                     </div>
                 )}
                 
-                {/* Plan Sugerido (Verde) */}
                 <div className="border border-slate-700 bg-slate-800/30 rounded-xl overflow-hidden"><div className="bg-slate-800/80 px-4 py-2 border-b border-slate-700 flex items-center gap-2"><ClipboardPlus size={16} className="text-emerald-400"/><span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">{appMode === 'admission' ? 'Plan Sugerido' : 'Plan de Manejo'}</span></div><div className="p-4 text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{appMode === 'admission' ? (processingResult as AiAnalysisResult).planEstructurado : (processingResult as AiEvolutionResult).planSugerido}</div></div>
               
               </div>
@@ -1476,6 +1337,31 @@ ${data.plan}`;
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://notas-medicas.vercel.app/" alt="QR Code" className="w-48 h-48"/>
               </div>
               <p className="mt-4 text-sm text-center text-slate-500 dark:text-slate-400">Escanea este código para abrir la aplicación.</p>
+           </div>
+        </div>
+      )}
+
+      {showNoteQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 max-w-sm w-full border border-slate-200 dark:border-slate-700">
+              <div className="flex justify-between w-full mb-4">
+                 <h3 className="font-bold text-lg dark:text-white">QR de Nota Médica</h3>
+                 <button onClick={() => setShowNoteQr(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner">
+                 {(() => {
+                    let qrData = '';
+                    if (appMode === 'admission') {
+                         qrData = `PACIENTE: ${form.nombre}\nEDAD: ${form.edad}\nFOLIO: ${form.folio}\nDX: ${form.diagnostico.join(', ') || 'No especificado'}`;
+                    } else {
+                         qrData = `PACIENTE: ${evoForm.nombre}\nFECHA: ${evoForm.fecha}\nFOLIO: ${evoForm.folio}\nDX ACTIVO: ${evoForm.diagnosticosActivos.join(', ') || 'No especificado'}`;
+                    }
+                    return (
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`} alt="Note QR Code" className="w-48 h-48"/>
+                    );
+                 })()}
+              </div>
+              <p className="mt-4 text-xs text-center text-slate-500 dark:text-slate-400">Escanea para ver información básica y diagnóstico.</p>
            </div>
         </div>
       )}
