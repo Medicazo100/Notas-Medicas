@@ -232,82 +232,102 @@ export default function App() {
 
     try {
         if (appMode === 'admission') {
+            // 1. Parsear datos crudos
             const parsedData = await AiService.parseData(importText);
             
             if (parsedData) {
-              setForm(prev => ({
-                ...prev,
+              // 2. Crear objeto fusionado
+              const newForm = {
+                ...form,
                 ...parsedData,
-                // Merge superficial seguro para signos y g
-                signos: { ...prev.signos, ...(parsedData.signos || {}) },
-                g: { ...prev.g, ...(parsedData.g || {}) }
-              }));
+                signos: { ...form.signos, ...(parsedData.signos || {}) },
+                g: { ...form.g, ...(parsedData.g || {}) }
+              };
+
+              // 3. Actualizar estado visual
+              setForm(newForm);
               setImportText('');
-              showToast('Formulario autocompletado e integrado en todas las secciones');
+              
+              // 4. GENERACIÓN AUTOMÁTICA (Auto-Analyze)
+              showToast('Datos integrados. Generando redacción médica...');
+              
+              // Usamos newForm directamente para no esperar al estado
+              const result = await AiService.analyze(newForm);
+              
+              if (result) {
+                  setProcessingResult(result);
+                  showToast('Nota generada y lista para revisión');
+              } else {
+                  showToast('Datos llenados. Haz clic en la estrella para analizar.');
+              }
+
             } else {
-              // No borramos texto si falla
-              showToast('No se pudieron interpretar los datos. Intenta mejorar el formato.');
+              showToast('No se pudieron interpretar los datos.');
             }
         } else {
-            // LÓGICA ROBUSTA Y EFICIENTE PARA EVOLUCIÓN
+            // LÓGICA EVOLUCIÓN
             const parsedData = await AiService.parseEvolutionData(importText);
 
             if (parsedData) {
-                setEvoForm(prev => {
-                    // Copia inmutable del estado
-                    const next = { ...prev };
-                    const incoming = parsedData as Partial<EvolutionForm>;
+                // Preparar el nuevo estado basado en el actual (prev -> evoForm)
+                const next = { ...evoForm }; 
+                const incoming = parsedData as Partial<EvolutionForm>;
+                const isValid = (v: any) => v !== undefined && v !== null && v !== '';
+                const complexKeys = ['signos', 'g', 'diagnosticosIngreso', 'diagnosticosActivos'];
+                
+                // Merge primitivos
+                Object.keys(incoming).forEach(key => {
+                    const k = key as keyof EvolutionForm;
+                    if (!complexKeys.includes(k) && isValid(incoming[k])) {
+                         // @ts-ignore
+                        next[k] = incoming[k];
+                    }
+                });
 
-                    // Helper para validar datos (no nulos/vacíos)
-                    const isValid = (v: any) => v !== undefined && v !== null && v !== '';
-
-                    // 1. Iteración dinámica para campos primitivos (strings)
-                    // Excluimos las claves complejas que manejaremos manualmente
-                    const complexKeys = ['signos', 'g', 'diagnosticosIngreso', 'diagnosticosActivos'];
-                    
-                    Object.keys(incoming).forEach(key => {
-                        const k = key as keyof EvolutionForm;
-                        // Si no es complejo y tiene valor válido, actualizamos
-                        if (!complexKeys.includes(k) && isValid(incoming[k])) {
-                             // @ts-ignore: Asignación segura dinámica
-                            next[k] = incoming[k];
+                // Merge Signos
+                if (incoming.signos) {
+                    next.signos = { ...evoForm.signos }; 
+                    Object.keys(incoming.signos).forEach(sk => {
+                        const key = sk as keyof typeof incoming.signos;
+                        if (isValid(incoming.signos![key])) {
+                            next.signos[key] = String(incoming.signos![key]);
                         }
                     });
+                }
 
-                    // 2. Merge profundo eficiente para Objetos (Signos)
-                    if (incoming.signos) {
-                        next.signos = { ...prev.signos }; // Copia superficial de signos previos
-                        Object.keys(incoming.signos).forEach(sk => {
-                            const key = sk as keyof typeof incoming.signos;
-                            if (isValid(incoming.signos![key])) {
-                                next.signos[key] = String(incoming.signos![key]);
-                            }
-                        });
-                    }
+                // Merge Glasgow
+                if (incoming.g) {
+                    next.g = { ...evoForm.g };
+                    if (isValid(incoming.g.o)) next.g.o = incoming.g.o;
+                    if (isValid(incoming.g.v)) next.g.v = incoming.g.v;
+                    if (isValid(incoming.g.m)) next.g.m = incoming.g.m;
+                }
 
-                    // 3. Merge profundo eficiente para Objetos (Glasgow)
-                    if (incoming.g) {
-                        next.g = { ...prev.g };
-                        if (isValid(incoming.g.o)) next.g.o = incoming.g.o;
-                        if (isValid(incoming.g.v)) next.g.v = incoming.g.v;
-                        if (isValid(incoming.g.m)) next.g.m = incoming.g.m;
-                    }
-
-                    // 4. Actualización de Arrays (Solo si hay nuevos datos)
-                    if (Array.isArray(incoming.diagnosticosIngreso) && incoming.diagnosticosIngreso.length > 0) {
-                        next.diagnosticosIngreso = incoming.diagnosticosIngreso;
-                    }
-                    if (Array.isArray(incoming.diagnosticosActivos) && incoming.diagnosticosActivos.length > 0) {
-                        next.diagnosticosActivos = incoming.diagnosticosActivos;
-                    }
-
-                    return next;
-                });
+                // Merge Arrays
+                if (Array.isArray(incoming.diagnosticosIngreso) && incoming.diagnosticosIngreso.length > 0) {
+                    next.diagnosticosIngreso = incoming.diagnosticosIngreso;
+                }
+                if (Array.isArray(incoming.diagnosticosActivos) && incoming.diagnosticosActivos.length > 0) {
+                    next.diagnosticosActivos = incoming.diagnosticosActivos;
+                }
                 
+                // Actualizar UI
+                setEvoForm(next);
                 setImportText('');
-                showToast('Evolución autocompletada e integrada correctamente');
+
+                // GENERACIÓN AUTOMÁTICA
+                showToast('Datos integrados. Generando análisis y plan...');
+                const result = await AiService.analyzeEvolution(next);
+
+                if (result) {
+                    setProcessingResult(result); // Abre el modal automáticamente
+                    showToast('Nota de Evolución generada');
+                } else {
+                    showToast('Datos llenados. Haz clic en la estrella para analizar.');
+                }
+
             } else {
-                showToast('No se encontraron datos estructurados. Revisa el texto e intenta de nuevo.');
+                showToast('No se encontraron datos estructurados.');
             }
         }
     } catch (error) {
